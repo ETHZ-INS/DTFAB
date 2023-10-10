@@ -8,11 +8,12 @@
 #' @return A data.frame of compiled metrics
 compileBenchmark <- function(datasets, rootPath=".", resin="runATAC_results", interactors){
   res <- list()
-  for(f in datasets){
-    tfn <- head(f$truth,1)
-    print(tfn)
+  for(dn in names(datasets)){
+    ds <- datasets[[dn]]
+    if(!is.null(ds$folder)) dn <- ds$folder
+    print(dn)
     tryCatch(
-      res[[tfn]] <- getBenchmarkMetrics(f, file.path(rootPath, tfn), interactors=interactors),
+      res[[dn]] <- getBenchmarkMetrics(f, file.path(rootPath, dn), interactors=interactors),
       error=function(e) message(e))
   }
   dplyr::bind_rows(res, .id="dataset")
