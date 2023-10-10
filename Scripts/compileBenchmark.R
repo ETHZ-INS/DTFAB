@@ -45,23 +45,27 @@ getBenchmarkMetrics <- function(dataset, path=head(dataset$truth,1), resin="runA
   names(fl) <- gsub("\\.rds$","",basename(fl))
   res <- lapply(fl, readRDS)
   res <- res[sapply(res, FUN=function(x) isTRUE(nrow(x)>1))]
-  cofactors <- union(dataset$truth,unlist(interactors[dataset$truth]))
-  allTFs <- unique(unlist(lapply(res,row.names)))
-  cofactors <- intersect(cofactors, allTFs)
-  cappedNCof <- min(length(cofactors),100)
-  optimalAUC <- sum(cumsum(c(rep(1,cappedNCof), rep(0,100-cappedNCof)))/100)
-  res <- dplyr::bind_rows(lapply(res, FUN=function(x){
-    w <- head(which(row.names(x) %in% dataset$truth),1)
-    x$isCofactor <- row.names(x) %in% cofactors
-    auc <- sum(cumsum(head(x$isCofactor,100)))/100
-    xsig <- x[which(x$padj<0.05),,drop=FALSE]
-    data.frame(rank=w, trueQ=x[w,"padj"],
-               FDR=sum(!xsig$isCofactor)/nrow(xsig),
-               AUC=auc, relAUC=auc/optimalAUC)
-  }), .id="method")
+  res <- dplyr::bind_rows(lapply(res, truth=dataset$truth, interactors=interactors,
+                                 FUN=.getBenchmarkMetrics), .id="method")
   res$elapsed <- rt[res$method, "elapsed"]
   res$cpu <- rt[res$method, "cpu"]
   res
+}
+
+.getBenchmarkMetrics <- function(x, truth, interactors){
+  cofactors <- unique(c(truth, unlist(interactors[truth])))
+  allTFs <- row.names(x)
+  cofactors <- intersect(cofactors, allTFs)
+  cappedNCof <- min(length(cofactors),100)
+  optimalAUC <- sum(cumsum(c(rep(1,cappedNCof), rep(0,100-cappedNCof)))/seq_len(100))
+  w <- head(which(row.names(x) %in% truth),1)
+  x$isCofactor <- row.names(x) %in% cofactors
+  auc <- sum(cumsum(head(x$isCofactor,100))/seq_len(100))
+  if(is.null(x$padj)) x$padj <- x$adj.P.Val
+  xsig <- x[which(x$padj<0.05),,drop=FALSE]
+  data.frame(rank=w, trueQ=x[w,"padj"],
+             FDR=sum(!xsig$isCofactor)/nrow(xsig),
+             AUC=auc, relAUC=auc/optimalAUC)
 }
 
 
