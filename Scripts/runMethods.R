@@ -18,11 +18,12 @@ getDatasets <- function(onlyPE=FALSE){
 
 runAll <- function(datasets=getDatasets(), ...){
   wd <- getwd()
-  for(ds in datasets){
-    tf <- head(ds$truth,1)
-    if(dir.exists(tf)){
-      print(tf)
-      runMethods(ds, head(ds$truth,1), ...)
+  for(dn in names(datasets)){
+    ds <- datasets[[dn]]
+    if(!is.null(ds$folder)) dn <- ds$folder
+    if(dir.exists(dn)){
+      print(dn)
+      runMethods(ds, dn, ...)
     }else{
       warning("Could not find dataset ",tf)
     }
@@ -117,7 +118,7 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
       seqStyle <- "UCSC"
     }
     if(length(seqStyle)>1)
-      seqStyle <- ifelse(any(grepl("Ensembl|ensembl",seqStyle)), "Ensembl", "UCSC")
+      seqStyle <- ifelse(any(grepl("Ensembl|ensembl",seqStyle)), "ensembl", "UCSC")
   }
   if(any(seqStyle=="NCBI")) seqStyle <- "UCSC"
   seqlevelsStyle(peaks) <- seqStyle
@@ -128,7 +129,7 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
     pmoi <- readRDS(pmoiPath)
   }else{
     pmoi <- getpmoi(genome=genome,
-                    peaks=peak,
+                    peaks=peaks,
                     spec=spec,
                     seqStyle=seqStyle, srcFolder=scriptsFolder)
     saveRDS(pmoi, pmoiPath)
