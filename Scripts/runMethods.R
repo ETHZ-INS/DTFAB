@@ -46,6 +46,20 @@ runAll <- function(datasets=getDatasets(), ...){
   }
 }
 
+runAllMt <- function(datasets=getDatasets(), nthreads=3, ...){
+  wd <- getwd()
+  library(BiocParallel)
+  bplapply(datasets, BPPARAM=MulticoreParam(nthreads), FUN=function(x){
+    dn <- head(x$truth,1)
+    if(!dir.exists(dn)){
+      warning("Could not find dataset ",tf)
+      return(0)
+    }
+    runMethods(x, dn, ...)
+    return(1)
+  })
+}
+
 #' Run all methods on one dataset
 #'
 #' @param dataset A dataset object (one of the list elements as produced by
