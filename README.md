@@ -27,5 +27,6 @@ Results can be benchmarked using:
 
 ```
 source("../Scripts/runMethods.R")
-res <- compileBenchmark(datasets)
+interactors <- readRDS("../Scripts/allInteractors.rds")
+res <- compileBenchmark(datasets, interactors=interactors)
 ```
