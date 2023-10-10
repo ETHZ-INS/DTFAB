@@ -1,3 +1,12 @@
+#' List of (real) benchmark datasets
+#'
+#' @param onlyPE Logical; whether to include only paired-end datasets (default F)
+#'
+#' @return A named list of datasets, where the names also indicate the 
+#'   corresponding subfolder. Each dataset is then also a list containing, 
+#'   minimally, the `truth` (character vector of true perturbed TF(s)) and
+#'   `species` (either h or m) slots. If the fragments are in bed/bed.gz format
+#'   (instead of bam), also specify `readType="bed"`.
 getDatasets <- function(onlyPE=FALSE){
   datasets <- list(
     BANP=list(truth="BANP", species="m"),
@@ -16,6 +25,12 @@ getDatasets <- function(onlyPE=FALSE){
   return(datasets)
 }
 
+#' Run all methods on all datasets
+#'
+#' @param datasets A named list of datasets, as produced by `getDatasets()`
+#' @param ... Passed to `runMethods`
+#'
+#' @return Nothing (results saved to disk)
 runAll <- function(datasets=getDatasets(), ...){
   wd <- getwd()
   for(dn in names(datasets)){
@@ -31,6 +46,21 @@ runAll <- function(datasets=getDatasets(), ...){
   }
 }
 
+#' Run all methods on one dataset
+#'
+#' @param dataset A dataset object (one of the list elements as produced by
+#'   `getDatasets()`)
+#' @param folder The folder where the dataset data is (and results will be saved).
+#'   Defaults to the current folder.
+#' @param scriptsFolder The path to the Scripts folder, relative to `folder`
+#' @param methods The methods to run.
+#' @param decoupleR_modes The decoupleR methods (beside consensus) to run.
+#' @param aggregation Whether or not to run the aggregations.
+#' @param rndSeed The random seed
+#' @param peakWidth The peak width to enforce (default 300, use 150 for NF peaks)
+#' @param forceRerun Whether to regenerate peak counts and motif instances
+#' 
+#' @return A list of dataframes for each method (also saves them to disk)
 runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
                        methods=c("chromVAR", 
                                  "monaLisa", 
