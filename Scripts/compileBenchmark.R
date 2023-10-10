@@ -13,7 +13,7 @@ compileBenchmark <- function(datasets, rootPath=".", resin="runATAC_results", in
     if(!is.null(ds$folder)) dn <- ds$folder
     print(dn)
     tryCatch(
-      res[[dn]] <- getBenchmarkMetrics(f, file.path(rootPath, dn), interactors=interactors),
+      res[[dn]] <- getBenchmarkMetrics(ds, file.path(rootPath, dn), interactors=interactors),
       error=function(e) message(e))
   }
   dplyr::bind_rows(res, .id="dataset")
