@@ -13,7 +13,8 @@ Each other folder represents a benchmark processed separately:
 * **simulations**: benchmark on semi-simulated datasets
 
 Each of these folders contains one folder per dataset, with a `peaks` and a `seq_files` subfolders 
-containing, respectively, the merged peaks and the (aligned reads). Due to size limitations the reads are not included in the repository, but are available on request.
+containing, respectively, the merged peaks and the (aligned) reads/fragments.
+Due to size limitations the reads are not included in the repository, but are available on request.
 
 To re-run the benchmark, simply do, from one of these folders:
 
@@ -26,7 +27,9 @@ runAll(datasets)
 Results can be benchmarked using:
 
 ```
-source("../Scripts/runMethods.R")
+source("../Scripts/compileBenchmark.R")
 interactors <- readRDS("../Scripts/allInteractors.rds")
 res <- compileBenchmark(datasets, interactors=interactors)
 ```
+
+The precompiled results are also available in the respective folders.

@@ -28,7 +28,8 @@ compileBenchmark <- function(datasets, rootPath=".", resin="runATAC_results", in
 #' @param interactors A named list of interactors per TF
 #'
 #' @return A data.frame of compiled metrics for one dataset
-getBenchmarkMetrics <- function(dataset, path=head(dataset$truth,1), resin="runATAC_results", interactors){
+getBenchmarkMetrics <- function(dataset, path=head(dataset$truth,1),
+                                resin="runATAC_results", interactors){
   # grab runtimes
   fl <- list.files(file.path(path, resin, "raw"), full=TRUE)
   names(fl) <- gsub("_raw\\.rds$","",basename(fl))

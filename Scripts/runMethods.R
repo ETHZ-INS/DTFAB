@@ -9,17 +9,17 @@
 #'   (instead of bam), also specify `readType="bed"`.
 getDatasets <- function(onlyPE=FALSE){
   datasets <- list(
-    BANP=list(truth="BANP", species="m"),
-    ESR1=list(truth=c("ESR1","ESR2"), species="h"),
-    GATA1=list(truth=c("GATA1"), species="h", readType="bed"),
-    GATA2=list(truth=c("GATA2"), species="h", readType="bed"),
-    RUNX1=list(truth=c("RUNX1"), species="h", readType="bed"),
-    RUNX2=list(truth=c("RUNX2"), species="h", readType="bed"),
-    KLF1=list(truth=c("KLF1"), species="h", readType="bed"),
-    MYC=list(truth=c("MYC"), species="h", readType="bed"),
-    NR1H3=list(truth=c("NR1H3"), species="m"),
-    NR1H4=list(truth=c("NR1H4"), species="m"),
-    NR3C1=list(truth="NR3C1", species="h")
+    BANP=list(truth="BANP", species="m", type="dTag"),
+    ESR1=list(truth=c("ESR1","ESR2"), species="h", type="ligand"),
+    GATA1=list(truth=c("GATA1"), species="h", readType="bed", type="deletion"),
+    GATA2=list(truth=c("GATA2"), species="h", readType="bed", type="deletion"),
+    RUNX1=list(truth=c("RUNX1"), species="h", readType="bed", type="deletion"),
+    RUNX2=list(truth=c("RUNX2"), species="h", readType="bed", type="deletion"),
+    KLF1=list(truth=c("KLF1"), species="h", readType="bed", type="deletion"),
+    MYC=list(truth=c("MYC"), species="h", readType="bed", type="deletion"),
+    NR1H3=list(truth=c("NR1H3"), species="m", type="ligand"),
+    NR1H4=list(truth=c("NR1H4"), species="m", type="ligand"),
+    NR3C1=list(truth="NR3C1", species="h", type="ligand")
   )
   if(onlyPE) datasets$NR3C1 <- NULL
   return(datasets)
@@ -760,4 +760,34 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
 }
 
 
-
+runCVariants <- function(datasets){
+  library(limma)
+  for(dn in names(datasets)){
+    ds <- datasets[[dn]]
+    if(!is.null(ds$folder)) dn <- ds$folder
+    if(dir.exists(dn)){
+      print(dn)
+      dev <- readRDS(file.path(dn, "runATAC_results", "raw", "CV_raw.rds"))[[3]]
+      assays(dev)$norm <- scale(assays(dev)$z)
+      qt <- preprocessCore::normalize.quantiles(assays(dev)$z)
+      dimnames(qt) <- dimnames(assays(dev)$z)
+      assays(dev)$qt <- qt
+      ass <- c("CV"="z", "CVnorm"="norm", "CVqt"="qt")
+      design <- c(rep(-1, ncol(dev)/2), rep(1, ncol(dev)/2))
+      for(f in names(ass)){
+        devMat <- assays(dev)[[ass[[f]]]]
+        fit <- eBayes(lmFit(devMat, design))
+        CVsel <- topTable(fit, number=Inf)
+        CVdf <- data.frame(row.names = rownames(CVsel),
+                           logFC = CVsel[, "logFC"], 
+                           padj = CVsel[, "adj.P.Val"], 
+                           p = CVsel[, "P.Value"],
+                           t = CVsel[, "t"])
+        CVdf$rank = seq_along(row.names(CVdf))
+        saveRDS(CVdf, file.path(dn, "runATAC_results", "with_pvalues", paste0(f, ".rds")))
+      }
+    }else{
+      warning("Could not find dataset ",tf)
+    }
+  } 
+}

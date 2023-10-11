@@ -5,7 +5,7 @@ register(MulticoreParam(8))
 runchromVAR <- function(counts, 
                         genome, 
                         motifs,
-                        design, doNorm=TRUE){
+                        design, doNorm=FALSE){
   # Adding GC-bias
   ptm <- proc.time()
   
