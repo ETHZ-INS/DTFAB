@@ -12,6 +12,7 @@
 #' @param BPPARAM A BiocParallel param object for multithreading
 #'
 #' @return A summarized experiment containing the motif scores.
+#' @author Pierre-Luc Germain
 #' @importFrom SummarizedExperiment SummarizedExperiment
 #' @importFrom BiocParallel SerialParam bplapply
 #' @import S4Vectors IRanges GenomicRanges
@@ -85,6 +86,7 @@ getModelBasedActivity <- function(x, pmoi, paired, peaks=NULL, wSize=200,
 #' @param BPPARAM A BiocParallel param object for multithreading
 #'
 #' @return A summarized experiment containing the motif scores.
+#' @author Pierre-Luc Germain
 #' @importFrom SummarizedExperiment SummarizedExperiment rowData<-
 #' @importFrom BiocParallel SerialParam bplapply
 #' @import S4Vectors IRanges GenomicRanges

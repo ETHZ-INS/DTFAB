@@ -1,3 +1,4 @@
+# taken from enrichMiR, with slight modifications
 regreg <- function(signal, matchMatrix, use.intercept=TRUE, minSize=0, binary=NULL, alpha=0){
   signal <- signal[names(signal) %in% row.names(matchMatrix)]
   matchMatrix <- matchMatrix[names(signal),]

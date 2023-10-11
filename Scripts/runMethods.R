@@ -46,6 +46,7 @@ runAll <- function(datasets=getDatasets(), ...){
   }
 }
 
+# multi-threaded version of runAll()
 runAllMt <- function(datasets=getDatasets(), nthreads=3, ...){
   wd <- getwd()
   library(BiocParallel)
