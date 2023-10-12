@@ -41,6 +41,12 @@ getBenchmarkMetrics <- function(dataset, path=head(dataset$truth,1),
   })
   rt <- rbind(elapsed=rt["elapsed",], cpu=colSums(rt[which(row.names(rt)!="elapsed"),]))
   rt <- as.data.frame(t(rt))
+  if(any(row.names(rt)=="decoupleR")){
+    # grab times for individual methods
+    dt <- readRDS(file.path(path, resin, "raw","decoupleR_raw.rds"))$runtime2
+    rt <- rbind(rt, data.frame(row.names=paste0("decoupleR",names(dt)),
+                               elapsed=dt, cpu=dt))
+  }
   # get actual results
   fl <- list.files(file.path(path, resin, "with_pvalues"), full=TRUE)
   names(fl) <- gsub("\\.rds$","",basename(fl))
