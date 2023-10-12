@@ -74,7 +74,8 @@ getModelBasedActivity <- function(x, pmoi, paired, peaks=NULL, wSize=200,
 
 #' getBagFootLike
 #' 
-#' Get motif*sample insertion counts within (footpring) and flanking each motif 
+#' Get motif*sample insertion counts within (footpring) and flanking each motif
+#' Largely inspired from Baek et al., 2017 10.1016/j.celrep.2017.05.003 
 #'
 #' @param x A named vector of bam files.
 #' @param pmoi A GRanges of motif instances, with a 'motif_id' column.
