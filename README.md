@@ -24,6 +24,12 @@ datasets <- getDatasets()
 runAll(datasets)
 ```
 
+To run only the top methods, use:
+
+```
+runAll(datasets, methods=getMethods(onlyTop=TRUE))
+```
+
 Results can be benchmarked using:
 
 ```

@@ -25,20 +25,32 @@ getDatasets <- function(onlyPE=FALSE){
   return(datasets)
 }
 
+#' Gets the names of the methods to run
+#'
+#' @param onlyTop Logical, whether to get only the top methods
+getMethods <- function(onlyTop=FALSE){
+  if(onlyTop)
+    return(c("chromVAR", "monaLisa", "StabSel", "msVIPERb", "VIPER", "ulm"))
+  return(c( "chromVAR", "monaLisa", "StabSel", "GSEA", "decoupleR", 
+            "VIPER", "VIPERb", "msVIPER", "msVIPERb",
+            "ulm", "ulmB", "ulmGC", "regreg", "regregR",
+            "BaGFoot", "MBA" ))
+}
+
 #' Run all methods on all datasets
 #'
 #' @param datasets A named list of datasets, as produced by `getDatasets()`
 #' @param ... Passed to `runMethods`
 #'
 #' @return Nothing (results saved to disk)
-runAll <- function(datasets=getDatasets(), ...){
+runAll <- function(datasets=getDatasets(), methods=getMethods(), ...){
   wd <- getwd()
   for(dn in names(datasets)){
     ds <- datasets[[dn]]
     if(!is.null(ds$folder)) dn <- ds$folder
     if(dir.exists(dn)){
       print(dn)
-      runMethods(ds, dn, ...)
+      runMethods(ds, dn, methods=methods, ...)
     }else{
       warning("Could not find dataset ",tf)
     }
@@ -68,7 +80,8 @@ runAllMt <- function(datasets=getDatasets(), nthreads=3, ...){
 #' @param folder The folder where the dataset data is (and results will be saved).
 #'   Defaults to the current folder.
 #' @param scriptsFolder The path to the Scripts folder, relative to `folder`
-#' @param methods The methods to run.
+#' @param methods The methods to run (default all). Use `getMethods(onlyTop=TRUE)`
+#'   to run only the top methods.
 #' @param decoupleR_modes The decoupleR methods (beside consensus) to run.
 #' @param aggregation Whether or not to run the aggregations.
 #' @param rndSeed The random seed
@@ -77,20 +90,9 @@ runAllMt <- function(datasets=getDatasets(), nthreads=3, ...){
 #' 
 #' @return A list of dataframes for each method (also saves them to disk)
 runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
-                       methods=c("chromVAR", 
-                                 "monaLisa", 
-                                 "GSEA", 
-                                 "VIPER", "VIPERb",
-                                 "msVIPER", "msVIPERb",
-                                 "StabSel", 
-                                 "decoupleR", 
-                                 "ulm", "ulmB", "ulmGC",
-                                 "regreg", "regregR",
-                                 "BaGFoot",
-                                 "MBA"),
+                       methods=getMethods(), aggregation=FALSE, 
                        decoupleR_modes=c("mlm", "ulm", "udt", "wsum"),
-                       aggregation=FALSE, rndSeed=1997, peakWidth=300,
-                       forceRerun=FALSE){
+                       rndSeed=1997, peakWidth=300, forceRerun=FALSE){
   
   methods <- match.arg(methods, several.ok = TRUE)
   
@@ -682,7 +684,7 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
   if ("regreg" %in% methods){
     set.seed(rndSeed)
     regreg <- runregreg(DARmat = DARmat,
-                        matchMtx = mb)
+                        matchMtx = mb, alpha=1)
     
     saveRDS(regreg, "./runATAC_results/raw/regreg_raw.rds")
     
@@ -718,9 +720,7 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
   if ("MBA" %in% methods){
     try({
     set.seed(rndSeed)
-    MBA <- runMBA(readlist,
-                  pmoi2,
-                  dataset$paired)
+    MBA <- runMBA(readlist, pmoi2, dataset$paired)
     saveRDS(MBA, "./runATAC_results/raw/MBA_raw.rds")
     MBA <- MBA[[1]]
     MBAdf <- data.frame(row.names=rownames(MBA),
@@ -770,10 +770,11 @@ runCVariants <- function(datasets){
       print(dn)
       dev <- readRDS(file.path(dn, "runATAC_results", "raw", "CV_raw.rds"))[[3]]
       assays(dev)$norm <- scale(assays(dev)$z)
+      assays(dev)$centered <- scale(assays(dev)$z, scale=FALSE)
       qt <- preprocessCore::normalize.quantiles(assays(dev)$z)
       dimnames(qt) <- dimnames(assays(dev)$z)
       assays(dev)$qt <- qt
-      ass <- c("CV"="z", "CVnorm"="norm", "CVqt"="qt")
+      ass <- c("CV"="z", "CVcentered"="centered", "CVnorm"="norm", "CVqt"="qt")
       design <- c(rep(-1, ncol(dev)/2), rep(1, ncol(dev)/2))
       for(f in names(ass)){
         devMat <- assays(dev)[[ass[[f]]]]

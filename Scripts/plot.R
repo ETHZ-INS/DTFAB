@@ -14,7 +14,7 @@ rankHeatmap2 <- function(res){
   rankm <- reshape2::dcast(res, method~dataset, value.var="rank")
   row.names(rankm) <- rankm[,1]
   rankm <- sqrt(as.matrix(rankm[,-1]))
-  rankm <- rankm[order(-rowMeans(rankm)), order(-colMeans(rankm))]
+  rankm <- rankm[order(rowMeans(rankm)), order(-colMeans(rankm))]
   type <- sapply(getDatasets(), FUN=function(x) x$type)
   draw(ComplexHeatmap::pheatmap(rankm, cluster_rows=FALSE, cluster_cols=FALSE,
      display_numbers=rankm^2, border=NA, number_color="black",
