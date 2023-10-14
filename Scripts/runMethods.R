@@ -19,7 +19,7 @@ getDatasets <- function(onlyPE=FALSE){
     MYC=list(truth=c("MYC"), species="h", readType="bed", type="deletion"),
     NR1H3=list(truth=c("NR1H3"), species="m", type="ligand"),
     NR1H4=list(truth=c("NR1H4"), species="m", type="ligand"),
-    NR3C1=list(truth="NR3C1", species="h", type="ligand")
+    NR3C1=list(truth=c("NR3C1","GCR"), species="h", type="ligand", paired=FALSE)
   )
   if(onlyPE) datasets$NR3C1 <- NULL
   return(datasets)
@@ -172,7 +172,8 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
   seqlevelsStyle(genome) <- seqStyle  
 
   # use pmoi if available
-  if(!forceRerun && file.exists(pmoiPath <- mypath("runATAC_results/others/pmoi.rds"))){
+  if(file.exists(pmoiPath <- mypath("runATAC_results/others/pmoi.rds")) && 
+     !forceRerun){
     pmoi <- readRDS(pmoiPath)
   }else{
     pmoi <- getpmoi(genome=genome,
@@ -189,8 +190,8 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
   design <- dataset$design
   
   # Obtaining read counts if not already available
-  if(!forceRerun &&
-     file.exists(cntsPath <- mypath("runATAC_results/others/countmatrix.rds"))){
+  if(file.exists(cntsPath <- mypath("runATAC_results/others/countmatrix.rds")) &&
+     !forceRerun){
     counts <- readRDS(cntsPath)
   }else{
     counts <- chromVAR::getCounts(readlist, peaks,
@@ -367,6 +368,15 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
     
     saveRDS(CVdf, "./runATAC_results/with_pvalues/CV.rds")
     readouts$CV <- CVdf
+    
+    dev <- CV[[3]]
+    dev$condition <- factor(design)
+    dd <- chromVAR::differentialDeviations(dev, "condition")
+    dd <- dd[order(dd$p_value),]
+    colnames(dd) <- c("p","padj")
+    dd$rank <- seq_len(nrow(dd))
+    saveRDS(dd, file.path("runATAC_results", "with_pvalues", "CVoriginal.rds"))
+    
   }
   
   # Run chromVAR with normalization
@@ -718,7 +728,7 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
   # run Model-based analysis
 
   if ("MBA" %in% methods){
-    try({
+    #try({
     set.seed(rndSeed)
     MBA <- runMBA(readlist, pmoi2, dataset$paired)
     saveRDS(MBA, "./runATAC_results/raw/MBA_raw.rds")
@@ -730,7 +740,7 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
     MBAdf$rank =seq_along(row.names(MBAdf))
     saveRDS(MBAdf, "runATAC_results/with_pvalues/MBA.rds")
     readouts$MBA <- MBAdf
-    }, silent=TRUE)
+    #}, silent=TRUE)
   }
 
 
@@ -738,7 +748,7 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
   # run BaGFootLike method
   
   if ("BaGFoot" %in% methods){
-  try({
+  #try({
     set.seed(rndSeed)
     BaGFoot <- runBaGFoot(readlist,
                           pmoi2,
@@ -753,7 +763,7 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
     BFdf$rank = seq_along(row.names(BFdf))
     saveRDS(BFdf,"./runATAC_results/with_pvalues/BaGFootLike.rds")
     readouts$BaGFoot <- BFdf
-  }, silent=TRUE)
+  #}, silent=TRUE)
   }
   
   saveRDS(readouts, "./runATAC_results/others/readouts.rds")
@@ -762,6 +772,7 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
 
 
 runCVariants <- function(datasets){
+  library(chromVAR)
   library(limma)
   for(dn in names(datasets)){
     ds <- datasets[[dn]]
@@ -788,6 +799,13 @@ runCVariants <- function(datasets){
         CVdf$rank = seq_along(row.names(CVdf))
         saveRDS(CVdf, file.path(dn, "runATAC_results", "with_pvalues", paste0(f, ".rds")))
       }
+      dev$condition <- factor(design)
+      dd <- chromVAR::differentialDeviations(dev, "condition")
+      dd <- dd[order(dd$p_value),]
+      colnames(dd) <- c("p","padj")
+      dd$rank <- seq_len(nrow(dd))
+      saveRDS(dd, file.path(dn, "runATAC_results", "with_pvalues", "CVoriginal.rds"))
+      
     }else{
       warning("Could not find dataset ",tf)
     }
