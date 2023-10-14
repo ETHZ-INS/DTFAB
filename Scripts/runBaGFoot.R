@@ -45,7 +45,8 @@ getModelBasedActivity <- function(x, pmoi, paired, peaks=NULL, wSize=200,
   })
   pmoi <- split(pmoi, pmoi$motif_id)
   message("Computing motifs signals...")
-  res <- bplapply(pmoi, BPPARAM=BPPARAM, FUN=function(m){
+  #res <- bplapply(pmoi, BPPARAM=BPPARAM, FUN=function(m){
+  res <- lapply(pmoi, FUN=function(m){
     motifSize <- width(m)[[1]]
     m <- resize(m, width=2*wSize, fix="center")
     vs <- lapply(x, FUN=function(x){
@@ -118,7 +119,8 @@ getBagFootLike <- function(x,
     }
     x <- x[seqlevels(pmoi[[1]])]
     message("Computing motif profiles...")
-    bplapply(pmoi, BPPARAM=BPPARAM, FUN=function(m){
+    #bplapply(pmoi, BPPARAM=BPPARAM, FUN=function(m){
+    lapply(pmoi, FUN=function(m){
       motifSize <- width(m)[[1]]
       moRange <- Reduce(":",round(fSize+c(-1,1)*motifSize/2))
       fdRange <- setdiff(Reduce(":",round(fSize+c(-1,1)*fdSize)),
@@ -152,7 +154,7 @@ getBagFootLike <- function(x,
 # setting out-of-bounds regions to `padVal`
 .views2Matrix <- function(v, padVal=NA_integer_){
   if(!is(v, "RleViewsList")) v <- RleViewsList(v)
-  ws <- width(v)[[1]][[1]]
+  ws <- width(v)[[head(which(lengths(v)>0),1)]][[1]]
   stopifnot(all(unlist(width(v))==ws))
   x <- Reduce(c, lapply(v[lengths(v)>0], padVal=padVal, FUN=.view2paddedAL))
   matrix(unlist(x), byrow=TRUE, ncol=ws)
