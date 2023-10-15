@@ -52,7 +52,7 @@ runAll <- function(datasets=getDatasets(), methods=getMethods(), ...){
       print(dn)
       runMethods(ds, dn, methods=methods, ...)
     }else{
-      warning("Could not find dataset ",tf)
+      warning("Could not find dataset ",dn)
     }
     setwd(wd)
   }
@@ -428,35 +428,27 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
                       genome)
     
     saveRDS(ML, "./runATAC_results/raw/ML_raw.rds")
+    saveRDS(ML$df, "./runATAC_results/with_pvalues/ML.rds")
+    readouts$ML <- ML$df
+
+    set.seed(rndSeed)
+    ML <- runmonaLisa(DAR, 
+                      motifs, 
+                      peaks, 
+                      genome, minAbsLfc=0.15)
+    saveRDS(ML, "./runATAC_results/raw/MLlower_raw.rds")
+    saveRDS(ML$df, "./runATAC_results/with_pvalues/MLlower.rds")
+
+    set.seed(rndSeed)
+    ML <- runmonaLisa(DAR, 
+                      motifs, 
+                      peaks, 
+                      genome, nBins=7)
+    saveRDS(ML, "./runATAC_results/raw/MLfewerBins_raw.rds")
+    saveRDS(ML$df, "./runATAC_results/with_pvalues/MLfewerBins.rds")
+
     
-    # Calculate bin-level p-values based on Simes method with code from 
-    # https://github.com/markrobinsonuzh/DAMEfinder/blob/master/R/simes_pval.R
-    
-    simes <- function(pval){ 
-      min((length(pval)*pval[order(pval)])/seq(from = 1, to = length(pval), by = 1))
-    }
-    
-    ML <- ML[[1]]
-    ML <- ML[, colData(ML)$bin.nochange == FALSE]
-    MLp <- assays(ML)$negLog10P
-    MLp <- 10^(MLp*-1)
-    
-    MLsimes <- apply(MLp, 1, simes)
-    
-    # Correct the p-values using FDR correction 
-    
-    MLdf <- data.frame(p = sort(MLsimes))
-    MLdf$rank <- seq_along(row.names(MLdf))
-    MLpadj <- p.adjust(MLdf$p, method="fdr")
-    MLdf <- cbind(padj = p.adjust(MLdf$p, method="fdr"), MLdf)
-    
-    saveRDS(MLdf, "./runATAC_results/with_pvalues/ML.rds")
-    readouts$ML <- MLdf
-    
-    # calculate correlation across bins
-    cors <- cor(t(assays(ML)$log2enr), seq_len(ncol(ML)), method="spearman")[,1]
-    names(cors) <- row.names(ML)
-    MLdf$binSpearman <- cors[row.names(MLdf)]
+    # use correlation across bins
     MLdf <- MLdf[order(abs(MLdf$binSpearman)*-log10(MLdf$p), decreasing=TRUE),]
     MLdf$rank <- seq_along(row.names(MLdf))
     saveRDS(MLdf, "./runATAC_results/with_pvalues/MLsp.rds")

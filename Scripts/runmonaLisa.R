@@ -1,9 +1,7 @@
 # First flavor of monaLisa: MOtif aNAlysis with Lisa
 
-runmonaLisa <- function(DAR,
-                        motifs,
-                        peaks,
-                        genome){
+runmonaLisa <- function(DAR, motifs, peaks, genome, nBins=11, minAbsLfc=0.3,
+                        background = c("zeroBin", "otherBins")){
   
   # At first a normalization should be done
   
@@ -13,8 +11,8 @@ runmonaLisa <- function(DAR,
   
   values(peaks) <- DataFrame(peak_FC)
 
-  fc2 <- peak_FC[which(abs(peak_FC)>=0.3)]
-  nElements <- ceiling(length(fc2)/11)
+  fc2 <- peak_FC[which(abs(peak_FC)>=minAbsLfc)]
+  nElements <- ceiling(length(fc2)/nBins)
   
   
   
@@ -24,8 +22,8 @@ runmonaLisa <- function(DAR,
                         nElements = nElements,
                         minAbsX = 0.3)
   
-  BinDensity <- plotBinDensity(peaks$peak_FC,
-                bins)
+  # BinDensity <- plotBinDensity(peaks$peak_FC,
+  #               bins)
 
   DARseqs <- getSeq(genome, 
                     peaks) # This is how they got sequences. I will also try it with our sequences from PLs motif prep.
@@ -46,52 +44,44 @@ runmonaLisa <- function(DAR,
                             bins = bins, 
                             pwmL = motifs, 
                             BPPARAM = BiocParallel::MulticoreParam(8),
-                            background = c("zeroBin"))
+                            background = match.arg(background))
+  
+  # Calculate bin-level p-values based on Simes method with code from 
+  # https://github.com/markrobinsonuzh/DAMEfinder/blob/master/R/simes_pval.R
+  simes <- function(pval){ 
+    min((length(pval)*pval[order(pval)])/seq(from = 1, to = length(pval), by = 1))
+  }
+  
+  ML <- se
+  zerobin <- which(colData(ML)$bin.nochange)
+  # assays(ML)$signedSigns <- t(t(sign(assays(ML)$log2enr))*
+  #                               rep(c(-1,0,1),c(zerobin-1L, 1, ncol(ML)-zerobin)))
+  ML <- ML[,-zerobin]
+  MLp <- 10^-assays(ML)$negLog10P
+  # MLsimes2 <- sapply(seq_len(nrow(ML)), FUN=function(i){
+  #   tryCatch({
+  #     ss <- assays(ML)$signedSigns[i,]
+  #     strongestSign <- ss[which.min(MLp[i,])]
+  #     simes(MLp[i,which(ss==strongestSign)])
+  #   }, error=function(e) return(NA_real_))
+  # })
+  # names(MLsimes2) <- row.names(ML)
+  
+  MLsimes <- apply(MLp, 1, simes)
+  
+  # Correct the p-values using FDR correction 
+  MLdf <- data.frame(p=MLsimes, padj=p.adjust(MLsimes))
+  MLdf <- MLdf[order(MLdf$p),]
+  MLdf$rank <- seq_along(row.names(MLdf))
+  
+  # calculate correlation across bins
+  cors <- cor(t(assays(ML)$log2enr), seq_len(ncol(ML)), method="spearman")[,1]
+  names(cors) <- row.names(ML)
+  MLdf$binSpearman <- cors[row.names(MLdf)]
   
   runtime <- proc.time()-ptm
-  return(list(res=se, runtime=runtime))
   
-  # This is commented out since it is currently not relevant.
-  #
-  # sel <- apply(assay(se, "negLog10Padj"), 
-  #              1, 
-  #              function(x) max(abs(x),
-  #                              0, 
-  #                              na.rm = TRUE)) > 1.3
-  # 
-  # seSel <- se[sel, ]
-  # 
-  # enrich_plot <- plotMotifHeatmaps(x = seSel, 
-  #                   which.plots = c("log2enr", 
-  #                                   "negLog10Padj"), 
-  #                   width = 2.0, 
-  #                   cluster = TRUE, 
-  #                   maxEnr = 2, 
-  #                   maxSig = 10, 
-  #                   show_motif_GC = TRUE)
-  # SimMatSel <- motifSimilarity(rowData(seSel)$motif.pfm)
-  # 
-  # # Create hclust object, similarity defined by 1 - Pearson correlation
-  # 
-  # hcl <- hclust(as.dist(1 - SimMatSel), 
-  #               method = "average")
-  # hcl_plot <- plotMotifHeatmaps(x = seSel, 
-  #                   which.plots = c("log2enr", 
-  #                                   "negLog10Padj"), 
-  #                   width = 1.8, 
-  #                   cluster = hcl, 
-  #                   maxEnr = 2, 
-  #                   maxSig = 10,
-  #                   show_dendrogram = TRUE,
-  #                   show_seqlogo = TRUE,
-  #                   width.seqlogo = 1.2)
-  #  
-  # # Selecting readout
-  # 
-  # return(list("BinDensity", 
-  #             "GC_fraction", 
-  #             "Dinucl_fraction", 
-  #             "enrich_plot", 
-  #             "hcl_plot"))
+  return(list(res=se, runtime=runtime, df=MLdf))
+  
 }
 
