@@ -58,30 +58,32 @@ chips <- list.files("ChIPpeaks", pattern="bed\\.gz$", full=TRUE)
 peakr <- dplyr::bind_rows(lapply(setNames(names(ds), names(ds)), FUN=function(x){
   atac <- rtracklayer::import(list.files(file.path("..","fullFrags",x,"peaks"), full=TRUE))
   pmoi <- readRDS(file.path("..","fullFrags",x,"runATAC_results","others","pmoi.rds"))
-  tmot <- ifelse(x=="NR3C1","GCR",x)
-  pmoi <- pmoi[pmoi$motif_id==tmot]
-  if(x=="ESR1") x <- "_ER_"
-  chip <- chips[grep(x,chips)]
-  if(length(chip)==0) return(NULL)
-  chip <- tryCatch({
-    rtracklayer::import(chip)
-  }, error=function(e){
-    import(chip, format="narrowPeak")
-  })
-  seqlevelsStyle(chip) <-
-    ifelse(any(seqlevelsStyle(atac)=="Ensembl"),"ensembl","UCSC")
-  chip$hasMotif <- overlapsAny(chip, pmoi)
-  atac$hasMotif <- overlapsAny(atac, pmoi)
-  atac$hasPeak <- overlapsAny(atac, chip)
-  data.frame(
-    ChIPpeaksWithMotif=sum(chip$hasMotif)/length(chip),
-    atacWithMotif=sum(atac$hasMotif)/length(atac),
-    atacChIP=sum(atac$hasPeak)/length(atac),
-    atacChIPWithMotif=sum(atac$hasMotif & atac$hasPeak)/sum(atac$hasPeak),
-    atacBgWithMotif=sum(atac$hasMotif & !atac$hasPeak)/sum(!atac$hasPeak),
-    atacMotifWithChIP=sum(atac$hasPeak & atac$hasMotif)/sum(atac$hasMotif),
-    atacPeakLog2EnrichmentWithinMotifs=log2(sum(atac$hasMotif & 
-                    atac$hasPeak)/(sum(atac$hasMotif)*sum(atac$hasPeak)/length(atac))))
+  truth <- intersect(gsub("NR3C1","GCR",ds[[x]]$truth), as.character(unique(pmoi$motif_id)))
+  dplyr::bind_rows(lapply(setNames(truth,truth), FUN=function(tmot){
+    pmoi <- pmoi[pmoi$motif_id==tmot]
+    if(x=="ESR1") x <- "_ER_"
+    chip <- chips[grep(x,chips)]
+    if(length(chip)==0) return(NULL)
+    chip <- tryCatch({
+      rtracklayer::import(chip)
+    }, error=function(e){
+      import(chip, format="narrowPeak")
+    })
+    seqlevelsStyle(chip) <-
+      ifelse(any(seqlevelsStyle(atac)=="Ensembl"),"ensembl","UCSC")
+    chip$hasMotif <- overlapsAny(chip, pmoi)
+    atac$hasMotif <- overlapsAny(atac, pmoi)
+    atac$hasPeak <- overlapsAny(atac, chip)
+    data.frame(
+      ChIPpeaksWithMotif=sum(chip$hasMotif)/length(chip),
+      atacWithMotif=sum(atac$hasMotif)/length(atac),
+      atacChIP=sum(atac$hasPeak)/length(atac),
+      atacChIPWithMotif=sum(atac$hasMotif & atac$hasPeak)/sum(atac$hasPeak),
+      atacBgWithMotif=sum(atac$hasMotif & !atac$hasPeak)/sum(!atac$hasPeak),
+      atacMotifWithChIP=sum(atac$hasPeak & atac$hasMotif)/sum(atac$hasMotif),
+      atacPeakLog2EnrichmentWithinMotifs=log2(sum(atac$hasMotif & 
+                      atac$hasPeak)/(sum(atac$hasMotif)*sum(atac$hasPeak)/length(atac))))
+  }), .id="Motif")
 }), .id="Dataset")
 saveRDS(peakr, "motifPeakData.rds")
 ```
@@ -90,9 +92,6 @@ saveRDS(peakr, "motifPeakData.rds")
 peakr <- readRDS("motifPeakData.rds")
 ```
 
-```{r, fig.width=5, fig.height=3}
-ggplot(peakr, aes(Dataset, atacPeakLog2EnrichmentWithinMotifs)) + geom_col() + ylab("log2(enrichment) of ChIP peaks\nin motif-containing ATAC peaks") + theme_bw()
-```
 
 ```{r}
 m <- merge(peakr, nsig, by="Dataset")

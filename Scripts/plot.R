@@ -10,21 +10,33 @@ rankHeatmap <- function(res, rankBreaks=c(1,6,20,50,100,200,400), squeeze=FALSE)
   p
 }
 
-rankHeatmap2 <- function(res){
+rankHeatmap2 <- function(res, rankBreaks=c(1,5,25,75,150,300,600), ..., 
+                         column_title="Datasets", doDraw=TRUE,
+                         datasetInfo=data.frame(
+                          type=sapply(getDatasets(), FUN=function(x) x$type))){
+  library(ComplexHeatmap)
   rankm <- reshape2::dcast(res, method~dataset, value.var="rank")
   row.names(rankm) <- rankm[,1]
   rankm <- sqrt(as.matrix(rankm[,-1]))
-  rankm <- rankm[order(rowMeans(rankm)), order(-colMeans(rankm))]
-  type <- sapply(getDatasets(), FUN=function(x) x$type)
-  draw(ComplexHeatmap::pheatmap(rankm, cluster_rows=FALSE, cluster_cols=FALSE,
-     display_numbers=rankm^2, border=NA, number_color="black",
-     color=viridisLite::viridis(100, direction=-1), name="Rank of\ntrue TF",
-     column_title="Datasets", column_title_side="bottom",
-     annotation_col=as.data.frame(type)[colnames(rankm),,drop=FALSE],
-     annotation_colors=list(type=c(deletion="red", dTag="black", ligand="darkblue"))),
-     merge=TRUE)
+  rankm <- rankm[, order(-colMeans(rankm))]
+  ro <- row.names(rankm)[order(rowMeans(rankm))]
+  LFCbased <- grepl("GSEA|ulm|msViper|decoupleR|MonaLisa|diffTF|-lm",row.names(rankm))
+  ancols <- list(type=c(deletion="darkorange3", dTag="black", ligand="darkslateblue"),
+                 LFCbased=c("FALSE"="white", "TRUE"="brown4"))
+  colan <- HeatmapAnnotation(df = datasetInfo[colnames(rankm),,drop=FALSE],
+                             col=ancols, show_annotation_name=FALSE)
+  h <- ComplexHeatmap::Heatmap(rankm, cluster_rows=FALSE, cluster_columns=FALSE,
+          cell_fun=function(j, i, x, y, width, height, fill) {
+            grid.text(sprintf("%1.0f", rankm[i, j]^2), x, y, gp = gpar(fontsize=9))
+                      },
+     col=viridisLite::viridis(100, direction=-1), name="Rank of\ntrue TF",
+     column_title=column_title, row_order=ro, ..., 
+     left_annotation=rowAnnotation(df=as.data.frame(LFCbased), col=ancols, show_legend=FALSE),
+     row_names_side="left", top_annotation=colan,
+     heatmap_legend_param=list(at=sqrt(rankBreaks), labels=c("top",rankBreaks[-1])))
+  if(!doDraw) return(h)
+  draw(h, merge=TRUE)
 }
-
 
 
 sensFDRplot <- function(res){
@@ -48,12 +60,37 @@ relAUCplot <- function(res, squeeze=FALSE){
   p
 }
 
+relAUCplot2 <- function(res, ..., row_order=NULL, doDraw=TRUE, column_title="Datasets",
+                         datasetInfo=data.frame(
+                           type=sapply(getDatasets(), FUN=function(x) x$type))){
+  m <- reshape2::dcast(res, method~dataset, value.var="relAUC")
+  row.names(m) <- m[,1]
+  m <- as.matrix(m[,-1])
+  m <- m[, order(colMeans(m))]
+  if(is.null(row_order)) row_order <- row.names(m)[order(-rowMeans(m))]
+
+  ancols <- list(type=c(deletion="darkorange3", dTag="black", ligand="darkslateblue"),
+                 LFCbased=c("FALSE"="white", "TRUE"="brown4"))
+  colan <- HeatmapAnnotation(df = datasetInfo[colnames(m),,drop=FALSE],
+                             col=ancols)
+  h <- ComplexHeatmap::Heatmap(
+      m, cluster_rows=FALSE, cluster_columns=FALSE, ..., 
+      cell_fun=function(j, i, x, y, width, height, fill) {
+        v <- gsub("^0","",round(m[i,j],2))
+        grid.text(v, x, y, gp = gpar(fontsize = 9))
+      },
+      col=viridisLite::magma(100), name="Relative\nnetwork AUC",
+      column_title=column_title, row_names_side="left", top_annotation=colan)
+  if(!doDraw) return(h)
+  draw(h, merge=TRUE)
+}
+
 runtimePlot <- function(res){
   res <- res[!is.na(res$elapsed),]
   res$runtime <- pmax(res$elapsed, res$cpu)
-  ggplot(res, aes(runtime/60, reorder(method,log10(runtime)))) + 
-    geom_boxplot(fill="lightgrey", outlier.size=1) + 
-    scale_x_log10() + theme_bw() + labs(x="Runtime (min)",y="")
+  ggplot(res, aes(runtime/60, reorder(method,sqrt(runtime)))) + stat_summary() +
+    #geom_boxplot(fill="lightgrey", outlier.size=1) + 
+    scale_x_sqrt() + theme_bw() + labs(x="CPU time (min)",y="")
 }
 
 plotAllMetrics <- function(res){
@@ -65,7 +102,7 @@ plotAllMetrics <- function(res){
   )
 }
 
-renameMethods <- function(x,renaming=NULL){
+renameMethods <- function(x, renaming=NULL){
   if(is.data.frame(x)){
     stopifnot("method" %in% colnames(x))
     x$method <- renameMethods(x$method, renaming=renaming)
@@ -74,11 +111,13 @@ renameMethods <- function(x,renaming=NULL){
   if(is.null(renaming)) renaming <- c(
     "CVoriginal"="chromVAR", "CV"="chromVAR>limma",
     "CVqt"="chromVAR>Qt>limma", "CVcentered"="chromVAR>center>limma",
-    "CVnorm"="chromVAR>scale>limma", ML="MonaLisa.vsOthers",
-    MLzero="MonaLisa.vsZero", MLsp="MonaLisa.vsOthers+spearman",
-    MLfewerBins="MonaLisa.vsOthers(fewer bins)", MLStabSel="MonaLisa.StabSel",
-    MLlower="MonaLisa.vsOthers(smaller zeroBin)", "regreg"="Lasso-lm", "regregR"="Ridge-lm", VIPER="viper(scores)>limma", VIPERb="viper(binary)>limma",
-    msVIPER="msViper(scores)", msVIPERb="msViper(binary)", ulmGC="ulm+GC", ulmB="ulm(binary)"
+    "CVnorm"="chromVAR>scale>limma", MLzero="MonaLisa.vsZero",
+    MLsp="MonaLisa.vsOthers+spearman", MLfewerBins="MonaLisa.vsOthers(fewer bins)",
+    MLStabSel="MonaLisa.StabSel", MLlower="MonaLisa.vsOthers(smaller zeroBin)",
+    ML="MonaLisa.vsOthers", "regreg"="Lasso-lm", "regregR"="Ridge-lm",
+    VIPER="viper(scores)>limma", VIPERb="viper(binary)>limma",
+    msVIPER="msViper(scores)", msVIPERb="msViper(binary)", ulmGC="ulm+GC", 
+    ulmB="ulm(binary)", ulm="ulm(scores)", MBA="InsertionModel"
   )
   for(i in names(renaming)) x <- replace(x, x==i, renaming[[i]])
   x <- gsub("decoupleR","decoupleR:",x)
@@ -86,7 +125,7 @@ renameMethods <- function(x,renaming=NULL){
   x
 }
 
-filterMainMethods <- function(x, rename=TRUE){
+filterMethods <- function(x, meth=getMainMethods(), rename=FALSE){
   w <- which(x$method=="CV" | x$method=="chromVAR>scale>limma")
   CVcpu <- setNames(x$cpu[w], x$dataset[w])
   CVelapsed <- setNames(x$elapsed[w], x$dataset[w])
@@ -94,12 +133,24 @@ filterMainMethods <- function(x, rename=TRUE){
   x$cpu[w] <- CVcpu[x$dataset[w]]
   x$elapsed[w] <- CVelapsed[x$dataset[w]]
   x$method <- as.character(x$method)
-  renames <- c(
-    chromVAR = "chromVAR", `chromVAR>Qt>limma` = "chromVAR-adjusted",
+  renames <- meth
+  if(rename) x <- renameMethods(x)
+  x <- x[which(x$method %in% names(renames)),]
+  renameMethods(x, renames)
+}
+
+getTopMethods <- function(){
+  c(chromVAR = "chromVAR", `chromVAR>Qt>limma` = "chromVAR-adjusted",
     MonaLisa.vsOthers = "MonaLisa", MonaLisa.StabSel = "StabSel", 
     `msViper(scores)` = "msViper", `viper(binary)>limma` = "viper", 
     `decoupleR:consensus` = "decoupleR", GSEA = "GSEA")
-  x <- renameMethods(x)
-  x <- x[which(x$method %in% names(renames)),]
-  renameMethods(x, renames)
+}
+
+getMainMethods <- function(){
+  c(chromVAR = "chromVAR", `chromVAR>Qt>limma` = "chromVAR-adjusted",
+    MonaLisa.vsOthers = "MonaLisa", MonaLisa.StabSel = "StabSel", 
+    `msViper(scores)` = "msViper", `viper(binary)>limma` = "viper", 
+    `decoupleR:consensus` = "decoupleR", GSEA = "GSEA",
+    InsertionModel="InsertionModel",ulmB="ulm","Lasso-lm"="Lasso",
+    "BaGFootLike"="BaGFootLike")
 }
