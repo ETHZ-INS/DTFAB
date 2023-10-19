@@ -1,3 +1,6 @@
 **/seq_files/*
 **/runATAC_results
 **/Rplots.pdf
+*SE.rds
+allDAres.rds
+*.html
