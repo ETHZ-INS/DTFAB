@@ -51,9 +51,9 @@ relAUCplot <- function(res, squeeze=FALSE){
 runtimePlot <- function(res){
   res <- res[!is.na(res$elapsed),]
   res$runtime <- pmax(res$elapsed, res$cpu)
-  ggplot(res, aes(runtime/60, method)) + 
+  ggplot(res, aes(runtime/60, reorder(method,log10(runtime)))) + 
     geom_boxplot(fill="lightgrey", outlier.size=1) + 
-    scale_x_log10() + theme_bw() + labs(x="Runtime (min)")
+    scale_x_log10() + theme_bw() + labs(x="Runtime (min)",y="")
 }
 
 plotAllMetrics <- function(res){
@@ -63,4 +63,43 @@ plotAllMetrics <- function(res){
     sensFDRplot(res), runtimePlot(res),
     nrow=2, labels="AUTO", scale=0.95, rel_heights = c(5,4)
   )
+}
+
+renameMethods <- function(x,renaming=NULL){
+  if(is.data.frame(x)){
+    stopifnot("method" %in% colnames(x))
+    x$method <- renameMethods(x$method, renaming=renaming)
+    return(x)
+  }
+  if(is.null(renaming)) renaming <- c(
+    "CVoriginal"="chromVAR", "CV"="chromVAR>limma",
+    "CVqt"="chromVAR>Qt>limma", "CVcentered"="chromVAR>center>limma",
+    "CVnorm"="chromVAR>scale>limma", ML="MonaLisa.vsOthers",
+    MLzero="MonaLisa.vsZero", MLsp="MonaLisa.vsOthers+spearman",
+    MLfewerBins="MonaLisa.vsOthers(fewer bins)", MLStabSel="MonaLisa.StabSel",
+    MLlower="MonaLisa.vsOthers(smaller zeroBin)", "regreg"="Lasso-lm", "regregR"="Ridge-lm", VIPER="viper(scores)>limma", VIPERb="viper(binary)>limma",
+    msVIPER="msViper(scores)", msVIPERb="msViper(binary)", ulmGC="ulm+GC", ulmB="ulm(binary)"
+  )
+  for(i in names(renaming)) x <- replace(x, x==i, renaming[[i]])
+  x <- gsub("decoupleR","decoupleR:",x)
+  x <- gsub("::",":",x,fixed=TRUE)
+  x
+}
+
+filterMainMethods <- function(x, rename=TRUE){
+  w <- which(x$method=="CV" | x$method=="chromVAR>scale>limma")
+  CVcpu <- setNames(x$cpu[w], x$dataset[w])
+  CVelapsed <- setNames(x$elapsed[w], x$dataset[w])
+  w <- which(grepl("^CV|^chromVAR",x$method) & is.na(x$cpu))
+  x$cpu[w] <- CVcpu[x$dataset[w]]
+  x$elapsed[w] <- CVelapsed[x$dataset[w]]
+  x$method <- as.character(x$method)
+  renames <- c(
+    chromVAR = "chromVAR", `chromVAR>Qt>limma` = "chromVAR-adjusted",
+    MonaLisa.vsOthers = "MonaLisa", MonaLisa.StabSel = "StabSel", 
+    `msViper(scores)` = "msViper", `viper(binary)>limma` = "viper", 
+    `decoupleR:consensus` = "decoupleR", GSEA = "GSEA")
+  x <- renameMethods(x)
+  x <- x[which(x$method %in% names(renames)),]
+  renameMethods(x, renames)
 }
