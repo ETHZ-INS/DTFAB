@@ -1,0 +1,122 @@
+---
+title: "Cell-level estimates"
+author: "Pierre-Luc Germain"
+date: "4/29/2023"
+output: html_document
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(GenomicRanges)
+  library(SingleCellExperiment)
+  library(chromVAR)
+  library(motifmatchr)
+  library(BSgenome.Hsapiens.UCSC.hg38)
+  library(ggplot2)
+  library(BiocParallel)
+})
+source("/common/scripts/getNonRedundantMotifs.R")
+```
+
+
+```{r, eval=FALSE}
+se <- readRDS("GSE168851_scATAC_K562_TimeCourse_Peak_Matrix_SE.rds")
+se <- se[,grep("^K562_D3", colnames(se))]
+assayNames(se) <- "counts"
+se <- addGCBias(se, genome=BSgenome.Hsapiens.UCSC.hg38)
+saveRDS(se, "D3.SE.rds")
+
+motifs <- getNonRedundantMotifs("PWMatrix")
+motif_ix <- matchMotifs(motifs, se,
+                         genome=BSgenome.Hsapiens.UCSC.hg38)
+saveRDS(motif_ix, "motif_ix.SE.rds")
+```
+
+```{r, include=FALSE}
+se <- readRDS("D3.SE.rds")
+motif_ix <- readRDS("motif_ix.SE.rds")
+```
+
+
+```{r, eval=TRUE}
+register(MulticoreParam(8))
+set.seed(123)
+system.time({ dev1 <- computeDeviations(se, motif_ix, background_peaks=getBackgroundPeaks(se, niterations=200)) })
+set.seed(123)
+system.time({ dev2 <- computeDeviations(se, motif_ix, background_peaks=getBackgroundPeaks(se, bs=30, niterations=200)) })
+set.seed(123)
+system.time({ dev3 <- computeDeviations(se, motif_ix, background_peaks=getBackgroundPeaks(se, w=0.05, niterations=200)) })
+saveRDS(dev1,"dev.SE.rds")
+saveRDS(dev2,"dev2.SE.rds")
+saveRDS(dev3,"dev3.SE.rds")
+dev <- dev1
+```
+
+```{r, include=FALSE}
+dev <- readRDS("dev.SE.rds")
+```
+
+
+```{r}
+assays(dev)$scaled <- scale(assays(dev)$z)
+assays(dev)$centered <- t(t(assays(dev)$z)-colMedians(assays(dev)$z))
+q <- preprocessCore::normalize.quantiles(assays(dev)$z)
+dimnames(q) <- dimnames(assays(dev)$z)
+assays(dev)$quantile <- q
+```
+
+```{r}
+dev <- dev[,!is.na(dev$sgAssign2) & dev$sgAssignD!="D3:UNK"]
+dev$TF <- gsub("sg","",dev$sgAssign3)
+names(tfs) <- tfs <- setdiff(unique(dev$TF), "NT")
+# names(ass) <- ass <- c("z","scaled","centered","quantile")
+names(ass) <- ass <- c("z")
+d <- dplyr::bind_rows(lapply(ass, FUN=function(a){
+  zsd <- sapply(split(seq_len(ncol(dev)),dev$sgAssign2), FUN=function(x) matrixStats::rowVars(assays(dev)[[a]][,x]))
+  zm <- sapply(split(seq_len(ncol(dev)),dev$sgAssign2), FUN=function(x) rowMeans(assays(dev)[[a]][,x]))
+  zm2 <- sapply(split(seq_len(ncol(zm)),gsub("sg|_[0-9]$","",colnames(zm))), FUN=function(i) rowMeans(zm[,i]))
+  row.names(zm2) <- row.names(zm) <- row.names(zsd) <- row.names(dev)
+  dplyr::bind_rows(lapply(tfs, FUN=function(x){
+    psd <- sqrt(mean(zsd[x,grep(paste0(x,"|NT"),colnames(zsd))]))
+    smd <- sapply(grep(x, colnames(zm), value=TRUE), FUN=function(i){ zm2[x,"NT"]-zm[x,i]/psd })
+    data.frame(sample=names(smd), smd=as.numeric(smd))
+  }), .id="TF")
+}), .id="assay")
+d$assay <- factor(d$assay, c("z","centered","scaled","quantile"))
+```
+
+
+```{r, fig.width=4, fig.height=6}
+ggplot(d, aes(assay, smd, group=sample, colour=TF)) + 
+  geom_hline(yintercept=d$smd[d$assay=="z"], linetype="dashed", colour="grey") +
+  geom_point(size=2) + geom_line(linewidth=1) + theme_bw() + 
+  labs(y="Standardized mean difference") + 
+  scale_y_continuous(breaks=c(0,1,2), limits=c(0,max(d$smd)+0.1), expand=expansion())
+
+
+ggplot(d, aes(method, smd, group=sample, colour=TF)) + 
+  geom_hline(yintercept=d$smd[d$method=="default"], linetype="dashed", colour="grey") +
+  geom_point(size=2) + geom_line(linewidth=1) + theme_bw() + 
+  labs(y="Standardized mean difference") + 
+  scale_y_continuous(breaks=c(0,1,2), limits=c(0,max(d$smd)+0.1), expand=expansion())
+
+```
+
+
+```{r, fig.width=8, fig.height=7}
+e <- sechm::meltSE(dev, tfs)
+ggplot(e, aes(sgAssign2, z)) + geom_boxplot(outlier.colour = NA) + facet_wrap(~feature, scales="free_y") + theme_bw() + theme(axis.text.x = element_text(angle=90, hjust=1, vjust=0.5))
+```
+
+```{r}
+plotTF <- function(e,tf){
+  e2 <- e[which(e$feature==tf & e$TF %in% c(tf,"NT")),]
+  e2 <- reshape2:::melt.data.frame(e2, id.vars=c("TF","sgAssign2"), measure.vars=c("z","centered","scaled","quantile"))
+  ggplot(e2, aes(sgAssign2, value, fill=TF==tf)) + geom_boxplot() + facet_wrap(~variable) + theme_bw() +
+    theme(axis.text.x = element_text(angle=90, hjust=1, vjust=0.5)) + ggtitle(tf) + labs(fill="KD")
+}
+plotTF(e, "KLF1")
+plotTF(e, "GATA1")
+plotTF(e, "GATA2")
+```
+
