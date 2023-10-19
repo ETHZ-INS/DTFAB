@@ -16,9 +16,9 @@ getDatasets <- function(onlyPE=FALSE){
     RUNX1=list(truth=c("RUNX1"), species="h", readType="bed", type="deletion"),
     RUNX2=list(truth=c("RUNX2"), species="h", readType="bed", type="deletion"),
     KLF1=list(truth=c("KLF1"), species="h", readType="bed", type="deletion"),
-    MYC=list(truth=c("MYC"), species="h", readType="bed", type="deletion"),
+    MYC=list(truth=c("MYC","MAX"), species="h", readType="bed", type="deletion"),
     NR1H3=list(truth=c("NR1H3"), species="m", type="ligand"),
-    NR1H4=list(truth=c("NR1H4"), species="m", type="ligand"),
+    NR1H4=list(truth=c("NR1H4","RXRA","RXRB"), species="m", type="ligand"),
     NR3C1=list(truth=c("NR3C1","GCR"), species="h", type="ligand", paired=FALSE)
   )
   if(onlyPE) datasets$NR3C1 <- NULL
@@ -421,6 +421,16 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
   # Run monaLisa 
   
   if ("monaLisa" %in% methods){
+    
+    ML <- runmonaLisa(DAR, 
+                      motifs, 
+                      peaks, 
+                      genome, background="zeroBin")
+    saveRDS(ML, "./runATAC_results/raw/MLzero_raw.rds")
+    saveRDS(ML$df, "./runATAC_results/with_pvalues/MLzero.rds")
+    readouts$MLzero <- ML$df
+    
+    
     set.seed(rndSeed)
     ML <- runmonaLisa(DAR, 
                       motifs, 
@@ -449,6 +459,7 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
 
     
     # use correlation across bins
+    MLdf <- readouts$ML
     MLdf <- MLdf[order(abs(MLdf$binSpearman)*-log10(MLdf$p), decreasing=TRUE),]
     MLdf$rank <- seq_along(row.names(MLdf))
     saveRDS(MLdf, "./runATAC_results/with_pvalues/MLsp.rds")
