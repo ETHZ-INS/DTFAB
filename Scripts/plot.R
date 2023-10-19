@@ -111,13 +111,13 @@ renameMethods <- function(x, renaming=NULL){
   if(is.null(renaming)) renaming <- c(
     "CVoriginal"="chromVAR", "CV"="chromVAR>limma",
     "CVqt"="chromVAR>Qt>limma", "CVcentered"="chromVAR>center>limma",
-    "CVnorm"="chromVAR>scale>limma", MLzero="MonaLisa.vsZero",
-    MLsp="MonaLisa.vsOthers+spearman", MLfewerBins="MonaLisa.vsOthers(fewer bins)",
-    MLStabSel="MonaLisa.StabSel", MLlower="MonaLisa.vsOthers(smaller zeroBin)",
-    ML="MonaLisa.vsOthers", "regreg"="Lasso-lm", "regregR"="Ridge-lm",
-    VIPER="viper(scores)>limma", VIPERb="viper(binary)>limma",
-    msVIPER="msViper(scores)", msVIPERb="msViper(binary)", ulmGC="ulm+GC", 
-    ulmB="ulm(binary)", ulm="ulm(scores)", MBA="InsertionModel"
+    "CVnorm"="chromVAR>scale>limma", MLzero="monaLisa.vsZero",
+    MLsp="monaLisa.vsOthers+spearman", MLfewerBins="monaLisa.vsOthers(fewer bins)",
+    MLStabSel="monaLisa.StabSel", MLlower="monaLisa.vsOthers(smaller zeroBin)",
+    ML="monaLisa.vsOthers", "regreg"="Lasso-lm", "regregR"="Ridge-lm",
+    VIPER="VIPER(scores)>limma", VIPERb="VIPER(binary)>limma",
+    msVIPER="msVIPER(scores)", msVIPERb="msVIPER(binary)", ulmGC="ulm+GC", 
+    ulmB="ulm(binary)", ulm="ulm(scores)", MBA="insertionModel", GSEA="fGSEA"
   )
   for(i in names(renaming)) x <- replace(x, x==i, renaming[[i]])
   x <- gsub("decoupleR","decoupleR:",x)
@@ -141,16 +141,16 @@ filterMethods <- function(x, meth=getMainMethods(), rename=FALSE){
 
 getTopMethods <- function(){
   c(chromVAR = "chromVAR", `chromVAR>Qt>limma` = "chromVAR-adjusted",
-    MonaLisa.vsOthers = "MonaLisa", MonaLisa.StabSel = "StabSel", 
-    `msViper(scores)` = "msViper", `viper(binary)>limma` = "viper", 
-    `decoupleR:consensus` = "decoupleR", GSEA = "GSEA")
+    monaLisa.vsOthers = "monaLisa", monaLisa.StabSel = "monaLisa.StabSel", 
+    `msVIPER(scores)` = "msVIPER", `VIPER(binary)>limma` = "VIPER", 
+    `decoupleR:consensus` = "decoupleR", fGSEA = "fGSEA")
 }
 
 getMainMethods <- function(){
   c(chromVAR = "chromVAR", `chromVAR>Qt>limma` = "chromVAR-adjusted",
-    MonaLisa.vsOthers = "MonaLisa", MonaLisa.StabSel = "StabSel", 
-    `msViper(scores)` = "msViper", `viper(binary)>limma` = "viper", 
-    `decoupleR:consensus` = "decoupleR", GSEA = "GSEA",
-    InsertionModel="InsertionModel",ulmB="ulm","Lasso-lm"="Lasso",
+    monaLisa.vsOthers = "monaLisa", monaLisa.StabSel = "monaLisa.StabSel", 
+    `msVIPER(scores)` = "msVIPER", `VIPER(binary)>limma` = "VIPER", 
+    `decoupleR:consensus` = "decoupleR", fGSEA = "fGSEA",
+    insertionModel="insertionModel", ulmB="ulm","Lasso-lm"="Lasso",
     "BaGFootLike"="BaGFootLike")
 }
