@@ -1,7 +1,7 @@
 # First flavor of monaLisa: MOtif aNAlysis with Lisa
 
 runmonaLisa <- function(DAR, motifs, peaks, genome, nBins=11, minAbsLfc=0.3,
-                        background = c("zeroBin", "otherBins")){
+                        background = c("otherBins","zeroBin")){
   
   # At first a normalization should be done
   
@@ -20,7 +20,7 @@ runmonaLisa <- function(DAR, motifs, peaks, genome, nBins=11, minAbsLfc=0.3,
   bins <- monaLisa::bin(x = peaks$peak_FC, 
                         binmode = "equalN", 
                         nElements = nElements,
-                        minAbsX = 0.3)
+                        minAbsX = minAbsLfc)
   
   # BinDensity <- plotBinDensity(peaks$peak_FC,
   #               bins)
