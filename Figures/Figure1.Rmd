@@ -23,10 +23,17 @@ h2 <- suppressWarnings(relAUCplot2(res, row_order=names(row_order(h1)), doDraw=F
 h <- grid.grabExpr(draw(h1 + h2, merge=TRUE))
 res2 <- filterMethods(res, rename=FALSE)
 res2$method <- gsub(":","",res2$method)
-cowplot::plot_grid(
+fig <- cowplot::plot_grid(
   h,
   plot_grid(sensFDRplot(res2), runtimePlot(res2), labels=LETTERS[2:3], nrow=1, scale=0.95),
   nrow=2, labels=c("A",NA), scale=c(0.95,1), rel_heights = c(6,3)
 )
+fig
+```
+
+```{r}
+pdf("Figure1.pdf", width=9, height=9)
+fig
+dev.off()
 ```
 

@@ -1,5 +1,5 @@
 ---
-title: "Paper title"
+title: "On the identification of differentially-active transcription fators from ATAC-seq data"
 subtitle: "Supplementary Figures"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 author: Pierre-Luc Germain
@@ -21,10 +21,13 @@ getFigNb <- function(increment=FALSE){
 
 ```{r}
 suppressPackageStartupMessages({
+  library(SummarizedExperiment)
   library(ggplot2)
   library(cowplot)
 })
 ```
+
+
 
 # `r getFigNb(TRUE)`
 
@@ -34,18 +37,19 @@ nsig <- dplyr::bind_rows(lapply(split(das2, das2$Dataset), FUN=function(x){
   data.frame(n=nrow(x), sig=sum(x$FDR<0.05,na.rm=TRUE),
              unadj=sum(x$PValue<0.05,na.rm=TRUE),
              unadjProp=sum(x$PValue<0.05,na.rm=TRUE)/nrow(x))
-}), .id="Dataset + ylim(c(-0.3,5))")
+}), .id="Dataset")
 nsig$label <- paste0("q<0.05: ", nsig$sig, "\np<0.05: ", round(100*nsig$unadjProp), "%")
-p1 <- ggplot(das2, aes(logFC, -log10(FDR))) + geom_hline(yintercept = -log10(0.05), linetype="dashed", colour="grey") + theme_bw() +
-  ggrastr::geom_point_rast(size=0.5) + facet_wrap(~Dataset) + 
-  geom_text(data=nsig, x=-4, y=max(sqrt(-log10(das2$FDR))), vjust=1, aes(label=label), size=3) + scale_y_sqrt()
+p1 <- ggplot(das2, aes(logFC, -log10(FDR))) + facet_wrap(~Dataset) + 
+  geom_hline(yintercept = -log10(0.05), linetype="dashed", colour="grey") + 
+  ggrastr::geom_point_rast(size=0.5) + theme_bw() + scale_y_sqrt() +
+  geom_text(data=nsig, x=-4, y=max(sqrt(-log10(das2$FDR))), vjust=1, aes(label=label), size=3)
 ```
 
 ```{r }
 peakr <- readRDS("../misc/motifPeakData.rds")
 ```
 
-```{r, fig.width=9, fig.height=3}
+```{r TFmotifInfo, fig.width=9, fig.height=3}
 p2 <- cowplot::plot_grid(
   ggplot(peakr, aes(Dataset, atacPeakLog2EnrichmentWithinMotifs, fill=Motif, label=Motif, Group=Motif)) + 
   geom_col(position="dodge") + geom_text(position = position_dodge(width = .9), angle=90, hjust=0, size=3) + 
@@ -59,15 +63,101 @@ p2 <- cowplot::plot_grid(
 #p2
 ```
 
-```{r, fig.height=10, fig.width=9}
+```{r SF1, fig.height=10, fig.width=9}
 cowplot::plot_grid(
   p1, p2, nrow=2, rel_heights=c(2,1), labels=c("A",NA), scale=c(0.95,1)
 )
 ```
 
-## `r getFigNb()`
-
-**Overview of the benchmark datasets and TFs. A:** Volcano plot of the differential accessibility analysis, illustrating the extent and significance of changes upon treatment in each dataset. The dashed line represents a 0.05 FDR threshold, and indicated are the number of ATAC peaks passing this threshold, as well as the proportion of peaks with an uncorrected p-value lower than 0.05. **B:** Enrichment for experimental binding sites of the factor (main TF after which the datasets are named) in ATAC peaks containing the respective motifs, versus all ATAC peaks. **C:** Proportion of ChIPseq peaks (overlapping ATAC peaks) that contain the respective motifs.
+**`r getFigNb()` : Overview of the benchmark datasets and TFs. A:** Volcano plot of the differential accessibility analysis, illustrating the extent and significance of changes upon treatment in each dataset. The dashed line represents a 0.05 FDR threshold, and indicated are the number of ATAC peaks passing this threshold, as well as the proportion of peaks with an uncorrected p-value lower than 0.05. **B:** Enrichment for experimental binding sites of the factor (main TF after which the datasets are named) in ATAC peaks containing the respective motifs, versus all ATAC peaks. **C:** Proportion of ChIPseq peaks (overlapping ATAC peaks) that contain the respective motifs.
 
 
+\newpage
 
+
+# `r getFigNb(TRUE)`
+
+```{r}
+ints <- readRDS("../Scripts/allInteractors.rds")
+resl <- lapply(c("chromVAR-adjusted"="CVqt", "monaLisa (vs OtherBins)"="ML",
+                 "chromVAR::differentialDeviations"="CVoriginal"), FUN=function(x){
+  readRDS(paste0("../fullFrags/GATA1/runATAC_results/with_pvalues/",x,".rds"))                 
+})
+ints <- intersect(c("GATA1",ints$GATA1 ), unique(unlist(lapply(resl, row.names))))
+resl[["optimal possible score"]] <- data.frame(row.names=head(c(ints, 1:100),100), rank=1:100)
+
+d <- dplyr::bind_rows(lapply(resl, FUN=function(e){
+  e$isCoFactor <- row.names(e) %in% ints
+  e$propCoFact <- cumsum(e$isCoFactor)/seq_len(nrow(e))
+  head(e[,c("rank","isCoFactor","propCoFact")],100)
+}), .id="Method")
+
+d$Method <- factor(d$Method, c("optimal possible score", "monaLisa (vs OtherBins)",
+                                sort(grep("chromVAR",names(resl),value=TRUE))))
+cols <- setNames(c("lightgrey", "darkgoldenrod", "deeppink2", "darkblue"),
+                 levels(d$Method))
+
+ggplot(d, aes(x=rank, y=propCoFact, ymax=propCoFact, fill=Method, colour=Method)) + 
+  geom_ribbon(ymin=0, alpha=0.6, linewidth=0.8) + theme_bw() +
+  scale_fill_manual(values=cols) + scale_colour_manual(values=cols) +
+  coord_cartesian(expand=0) + 
+  labs(x="Ranked motifs", y="Proportion of top motifs among network members")
+```
+
+
+**`r getFigNb()` : Illustration of the computation of the network score** The motif are ranked for
+each method, and for each k=1:100 the proportion of top k motifs that are part of
+the known network of the true TF is computed. The area under the curve is reported,
+relative to the AUC of the best possible motif ordering for that factor.
+
+
+\newpage
+
+
+
+
+# `r getFigNb(TRUE)`
+
+```{r}
+dev <- readRDS("../singleCell/dev.SE.rds")
+assays(dev)$scaled <- scale(assays(dev)$z)
+assays(dev)$centered <- t(t(assays(dev)$z)-colMedians(assays(dev)$z))
+q <- preprocessCore::normalize.quantiles(assays(dev)$z)
+dimnames(q) <- dimnames(assays(dev)$z)
+assays(dev)$quantile <- q
+
+dev <- dev[,!is.na(dev$sgAssign2) & dev$sgAssignD!="D3:UNK"]
+dev$TF <- gsub("sg","",dev$sgAssign3)
+names(tfs) <- tfs <- setdiff(unique(dev$TF), "NT")
+names(ass) <- ass <- c("z","scaled","centered","quantile")
+d <- dplyr::bind_rows(lapply(ass, FUN=function(a){
+  zsd <- sapply(split(seq_len(ncol(dev)),dev$sgAssign2), FUN=function(x) matrixStats::rowVars(assays(dev)[[a]][,x]))
+  zm <- sapply(split(seq_len(ncol(dev)),dev$sgAssign2), FUN=function(x) rowMeans(assays(dev)[[a]][,x]))
+  zm2 <- sapply(split(seq_len(ncol(zm)),gsub("sg|_[0-9]$","",colnames(zm))), FUN=function(i) rowMeans(zm[,i]))
+  row.names(zm2) <- row.names(zm) <- row.names(zsd) <- row.names(dev)
+  dplyr::bind_rows(lapply(tfs, FUN=function(x){
+    psd <- sqrt(mean(zsd[x,grep(paste0(x,"|NT"),colnames(zsd))]))
+    smd <- sapply(grep(x, colnames(zm), value=TRUE), FUN=function(i){ zm2[x,"NT"]-zm[x,i]/psd })
+    data.frame(sample=names(smd), smd=as.numeric(smd))
+  }), .id="TF")
+}), .id="assay")
+d$assay <- factor(d$assay, c("z","centered","scaled","quantile"))
+dbase <- d[d$assay=="z",]
+dbase <- setNames(dbase$smd, dbase$sample)
+d$baseline <- dbase[d$sample]
+d$difference <- d$smd-d$baseline
+```
+
+
+```{r, fig.width=8, fig.height=7}
+d$transformation <- d$assay
+levels(d$transformation)[1] <- "none"
+ggplot(d, aes(transformation, smd, group=sample, colour=TF)) + 
+    geom_hline(data=d[d$transformation=="z",],aes(yintercept=smd), linetype="dashed", colour="grey") +
+    geom_point(size=2) + geom_line(linewidth=1) + theme_bw() + 
+    labs(y="Standardized mean difference") + 
+    facet_wrap(~TF, scales="free") +
+    theme(legend.position="none", axis.text.x=element_text(angle=45, hjust=1, vjust=1))
+```
+
+**`r getFigNb()` : Impact of chromVAR motif z-score normalization at the single-cell level.** As a proxy to signal-to-noise ratio, we computed the standardizeed mean difference of the respective motif for each guide RNA (individual lines) to the mean control of the control guide RNA. Centering is always beneficial (Wilcoxon p<`r format(wilcox.test(d$difference[d$assay=="centered"], alternative="greater")$p.value, digits=1)`), unit-variance scaling is often beneficial (Wilcoxon p~`r format(wilcox.test(d$difference[d$assay=="scaled"], alternative="greater")$p.value, digits=1)`) but sometimes detrimental, and quantile normalization also tends to be beneficial (Wilcoxon p~`r format(wilcox.test(d$difference[d$assay=="quantile"], alternative="greater")$p.value, digits=2)`).
