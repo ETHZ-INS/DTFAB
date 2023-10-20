@@ -20,7 +20,8 @@ rankHeatmap2 <- function(res, rankBreaks=c(1,5,25,75,150,300,600), ...,
   rankm <- sqrt(as.matrix(rankm[,-1]))
   rankm <- rankm[, order(-colMeans(rankm))]
   ro <- row.names(rankm)[order(rowMeans(rankm))]
-  LFCbased <- grepl("GSEA|ulm|msViper|decoupleR|MonaLisa|diffTF|-lm",row.names(rankm))
+  LFCbased <- grepl("GSEA|ulm|msViper|decoupleR|MonaLisa|diffTF|-lm",
+                    row.names(rankm),ignore.case=TRUE)
   ancols <- list(type=c(deletion="darkorange3", dTag="black", ligand="darkslateblue"),
                  LFCbased=c("FALSE"="white", "TRUE"="brown4"))
   colan <- HeatmapAnnotation(df = datasetInfo[colnames(rankm),,drop=FALSE],
