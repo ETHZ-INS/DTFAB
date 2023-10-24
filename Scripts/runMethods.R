@@ -106,6 +106,7 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
     library(monaLisa)
     library(fgsea)
     library(stringr)
+    devtools::install_github("Jiayi-Wang-Joey/chromVAR")
     library(chromVAR)
     library(motifmatchr)
     library(BiocParallel)

@@ -5,7 +5,7 @@ register(MulticoreParam(8))
 runchromVAR <- function(counts, 
                         genome, 
                         motifs,
-                        design, doNorm=FALSE){
+                        design, doNorm=FALSE, TMM = FALSE){
   # Adding GC-bias
   ptm <- proc.time()
   
@@ -44,8 +44,10 @@ runchromVAR <- function(counts,
   
   dev <- computeDeviations(object = counts_filtered, 
                            annotations = motif_matrix,
+                           expectation = computeExpectations(counts_filtered),
                            background_peaks=getBackgroundPeaks(counts_filtered, 
-                                                               niterations=2000))
+                                                               niterations=2000),
+                           TMM = TMM)
   
   # Compute variability
   
