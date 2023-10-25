@@ -2,7 +2,7 @@
 #' 
 #' @param x A named vector of bam files.
 #' @param pmoi A GRanges of motif instances, with a 'motif_id' column.
-#' @param wSize Positive integer scaler of the window size around motifs. (200 is bagfoot's)
+#' @param wSize Positive integer scaler of the window size around motifs.
 #' @param paired Logical; whether or not the data is paired.
 #' @param peaks A GRanges of peaks (analyses will be restricted to that). If 
 #'   not given, signal around all motif instances in `pmoi` is used.
@@ -56,10 +56,13 @@ getModelBasedActivity <- function(x, pmoi, paired, peaks=NULL, wSize=200,
     rm(m)
     global <- colSums(do.call(rbind,vs))
     # to avoid seq bias, use the median coverage as weight for inside the footprint
-    moRange <- round(wSize+c(-1,1)*motifSize/2)
-    global[moRange] <- round(median(global[moRange]))
-    bgP <- mean(global[c(1:2,length(global)-1,length(global))])
-    global <- (1L+global)/(1L+bgP)
+    moRange <- c(floor(wSize-motifSize/2),ceiling(wSize+motifSize/2))
+    global[moRange] <- (global[moRange]+median(global[moRange]))/2
+    global <- smooth(global, twiceit=TRUE)
+    # make symmetrical
+    global <- global+rev(global)
+    # normalize
+    global <- length(global)*global/sum(global)
     list(scores=sapply(vs, FUN=function(x){
       sum(x*global)
     }), global=global)
