@@ -19,7 +19,7 @@ getFigNb <- function(increment=FALSE){
 }
 ```
 
-```{r}
+```{r packages}
 suppressPackageStartupMessages({
   library(SummarizedExperiment)
   library(ggplot2)
@@ -45,11 +45,8 @@ p1 <- ggplot(das2, aes(logFC, -log10(FDR))) + facet_wrap(~Dataset) +
   geom_text(data=nsig, x=-4, y=max(sqrt(-log10(das2$FDR))), vjust=1, aes(label=label), size=3)
 ```
 
-```{r }
-peakr <- readRDS("../misc/motifPeakData.rds")
-```
-
 ```{r TFmotifInfo, fig.width=9, fig.height=3}
+peakr <- readRDS("../misc/motifPeakData.rds")
 p2 <- cowplot::plot_grid(
   ggplot(peakr, aes(Dataset, atacPeakLog2EnrichmentWithinMotifs, fill=Motif, label=Motif, Group=Motif)) + 
   geom_col(position="dodge") + geom_text(position = position_dodge(width = .9), angle=90, hjust=0, size=3) + 
@@ -69,7 +66,17 @@ cowplot::plot_grid(
 )
 ```
 
-**`r getFigNb()` : Overview of the benchmark datasets and TFs. A:** Volcano plot of the differential accessibility analysis, illustrating the extent and significance of changes upon treatment in each dataset. The dashed line represents a 0.05 FDR threshold, and indicated are the number of ATAC peaks passing this threshold, as well as the proportion of peaks with an uncorrected p-value lower than 0.05. **B:** Enrichment for experimental binding sites of the factor (main TF after which the datasets are named) in ATAC peaks containing the respective motifs, versus all ATAC peaks. **C:** Proportion of ChIPseq peaks (overlapping ATAC peaks) that contain the respective motifs.
+**`r getFigNb()` : Overview of the benchmark datasets and TFs. **
+**A:** Volcano plot of the differential accessibility analysis, illustrating the 
+extent and significance of changes upon treatment in each dataset. The dashed 
+line represents a 0.05 FDR threshold, and indicated are the number of ATAC peaks 
+passing this threshold, as well as the proportion of peaks with an uncorrected 
+p-value lower than 0.05. 
+**B:** Enrichment for experimental binding sites of the factor (main TF after 
+which the datasets are named) in ATAC peaks containing the respective motifs, 
+versus all ATAC peaks. 
+**C:** Proportion of ChIPseq peaks (overlapping ATAC peaks) that contain the 
+respective motifs.
 
 
 \newpage
@@ -78,13 +85,46 @@ cowplot::plot_grid(
 # `r getFigNb(TRUE)`
 
 ```{r}
+cors <- readRDS("../misc/CV_repro_cors.rds")
+means <- aggregate(cors$correlation, cors[,1:2], FUN=mean)
+se <- aggregate(cors$correlation, cors[,1:2], FUN=sd)
+se$x <- se$x/sqrt(7)
+means$upper <- means$x+se$x
+means$lower <- means$x-se$x
+p1 <- ggplot(means, aes(niter, x, group=dataset)) + 
+  geom_ribbon(aes(ymax=upper, ymin=lower, fill=dataset), alpha=0.15) + 
+  geom_line(aes(colour=dataset), linewidth=1) + theme_bw() +
+  labs(y="Correlation, across random seeds, of\nthe ranks of the union of top 20 motifs",
+       x="Number of chromVAR background iterations\n(default 50)") +
+  theme(legend.position="none") + coord_cartesian(expand=FALSE, ylim=c(0.5,1))
+```
+
+
+```{r}
+se <- readRDS("../fullFrags/BANP/runATAC_results/raw/MBA_raw.rds")$obj1
+gl <- metadata(se)$globalProfiles
+row.names(gl) <- row.names(se)
+colnames(gl) <- seq(from=-200,to=200)[-201]
+m <- reshape2::melt(gl, varnames=c("Motif","Position"))
+m$Position <- as.integer(m$Position)
+
+p2 <- ggplot(m[m$Motif %in% c("FOXO1","SOX2", "CTCF"),], aes(Position, value, colour=Motif)) +
+  geom_line(linewidth=0.9) + theme_bw() + 
+  labs(x="Position around motif center", y="Weight",
+       title="Position weights based on insertion sites\naround the motif in the whole dataset") +
+  theme(legend.position=c(0.85,0.8), panel.grid.major=element_blank(), title=element_text(size=10),
+        panel.grid.minor=element_blank()) + coord_cartesian(expand=FALSE)
+```
+
+
+```{r, fig.width=8, fig.height=5}
 ints <- readRDS("../Scripts/allInteractors.rds")
 resl <- lapply(c("chromVAR-adjusted"="CVqt", "monaLisa (vs OtherBins)"="ML",
                  "chromVAR::differentialDeviations"="CVoriginal"), FUN=function(x){
   readRDS(paste0("../fullFrags/GATA1/runATAC_results/with_pvalues/",x,".rds"))                 
 })
 ints <- intersect(c("GATA1",ints$GATA1 ), unique(unlist(lapply(resl, row.names))))
-resl[["optimal possible score"]] <- data.frame(row.names=head(c(ints, 1:100),100), rank=1:100)
+resl[["optimal possible ranking"]] <- data.frame(row.names=head(c(ints, 1:100),100), rank=1:100)
 
 d <- dplyr::bind_rows(lapply(resl, FUN=function(e){
   e$isCoFactor <- row.names(e) %in% ints
@@ -92,23 +132,37 @@ d <- dplyr::bind_rows(lapply(resl, FUN=function(e){
   head(e[,c("rank","isCoFactor","propCoFact")],100)
 }), .id="Method")
 
-d$Method <- factor(d$Method, c("optimal possible score", "monaLisa (vs OtherBins)",
+d$Method <- factor(d$Method, c("optimal possible ranking", "monaLisa (vs OtherBins)",
                                 sort(grep("chromVAR",names(resl),value=TRUE))))
 cols <- setNames(c("lightgrey", "darkgoldenrod", "deeppink2", "darkblue"),
                  levels(d$Method))
 
-ggplot(d, aes(x=rank, y=propCoFact, ymax=propCoFact, fill=Method, colour=Method)) + 
-  geom_ribbon(ymin=0, alpha=0.6, linewidth=0.8) + theme_bw() +
+p3 <- ggplot(d, aes(x=rank, y=propCoFact, ymax=propCoFact, fill=Method, colour=Method)) + 
+  geom_ribbon(ymin=0, alpha=0.4, linewidth=0.8) + theme_bw() +
   scale_fill_manual(values=cols) + scale_colour_manual(values=cols) +
   coord_cartesian(expand=0) + 
-  labs(x="Ranked motifs", y="Proportion of top motifs among network members")
+  labs(x="Ranked motifs according to method",
+       y="Proportion of top motifs among network members")
+```
+
+```{r, fig.width=8, fig.height=8.5}
+plot_grid(plot_grid(p1,p2,nrow=1,labels="AUTO",scale=0.95),
+          p3,nrow=2,labels=c(NA,"C"), scale=c(1,0.95), rel_heights = c(4.5,5))
 ```
 
 
-**`r getFigNb()` : Illustration of the computation of the network score** The motif are ranked for
-each method, and for each k=1:100 the proportion of top k motifs that are part of
-the known network of the true TF is computed. The area under the curve is reported,
-relative to the AUC of the best possible motif ordering for that factor.
+**`r getFigNb()`** 
+**A: Reproducibility of chromVAR-based differential accessibility ananylsis.**
+Each color represents a dataset. The line and shaded area respectively represent 
+the mean and standard error of the correlation, across independent runs of the 
+chromVAR>limma pipeline, of the ranks of the (union of) top 20 motifs.
+**B: Illustration of the motif-specific position weights for the insertionModel method.**
+**C: Illustration of the computation of the network score** 
+The motif are ranked for each method, and for each k=1:100 the proportion of 
+top k motifs that are part of the known network of the true TF is computed. The
+example plotted here is from the GATA1 dataset. The area under the curve is then
+reported, relative to the AUC of the best possible motif ordering for that 
+factor (gray area).
 
 
 \newpage
@@ -160,4 +214,12 @@ ggplot(d, aes(transformation, smd, group=sample, colour=TF)) +
     theme(legend.position="none", axis.text.x=element_text(angle=45, hjust=1, vjust=1))
 ```
 
-**`r getFigNb()` : Impact of chromVAR motif z-score normalization at the single-cell level.** As a proxy to signal-to-noise ratio, we computed the standardizeed mean difference of the respective motif for each guide RNA (individual lines) to the mean control of the control guide RNA. Centering is always beneficial (Wilcoxon p<`r format(wilcox.test(d$difference[d$assay=="centered"], alternative="greater")$p.value, digits=1)`), unit-variance scaling is often beneficial (Wilcoxon p~`r format(wilcox.test(d$difference[d$assay=="scaled"], alternative="greater")$p.value, digits=1)`) but sometimes detrimental, and quantile normalization also tends to be beneficial (Wilcoxon p~`r format(wilcox.test(d$difference[d$assay=="quantile"], alternative="greater")$p.value, digits=2)`).
+**`r getFigNb()` : Impact of chromVAR motif z-score normalization at the single-cell level.** 
+As a proxy to signal-to-noise ratio, we computed the standardizeed mean 
+difference of the respective motif for each guide RNA (individual lines) to the 
+mean control of the control guide RNA. Centering is always beneficial (Wilcoxon 
+p<`r format(wilcox.test(d$difference[d$assay=="centered"], alternative="greater")$p.value, digits=1)`),
+unit-variance scaling is often beneficial (Wilcoxon 
+p~`r format(wilcox.test(d$difference[d$assay=="scaled"], alternative="greater")$p.value, digits=1)`) 
+but sometimes detrimental, and quantile normalization also tends to be beneficial 
+(Wilcoxon p~`r format(wilcox.test(d$difference[d$assay=="quantile"], alternative="greater")$p.value, digits=2)`).

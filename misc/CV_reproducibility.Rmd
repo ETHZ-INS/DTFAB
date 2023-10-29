@@ -1,0 +1,89 @@
+---
+title: "chromVAR reproducibility"
+output: html_document
+date: "2023-10-28"
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(chromVAR)
+  library(SummarizedExperiment)
+  library(Matrix)
+  library(BiocParallel)
+  library(limma)
+})
+```
+
+```{r}
+pmoi2sm <- function(peaks, pmoi){
+  pmoi$motif_id <- factor(pmoi$motif_id)
+  o <- findOverlaps(peaks, pmoi, ignore.strand=TRUE)
+  mb <- sparseMatrix(from(o), as.integer(pmoi$motif_id[to(o)]))
+  
+  row.names(mb) <- as.character(granges(peaks))
+  colnames(mb) <- levels(pmoi$motif_id)
+  mb
+}
+ds <- list.dirs(recursive=FALSE)
+names(ds) <- basename(ds)
+n <- 7
+names(nits) <- nits <- c(50,100,200,500,1000)
+```
+
+
+```{r}
+set.seed(123)
+register(MulticoreParam(6))
+res <- lapply(ds, FUN=function(x){
+  se <- readRDS(paste0(x, "/runATAC_results/others/countmatrix.rds"))
+  an <- readRDS(paste0(x, "/runATAC_results/others/pmoi.rds"))
+  an <- pmoi2sm(rowRanges(se),an)
+  w <- which(rowSums(assay(se))>1)
+  se <- se[w,]
+  an <- an[w,]
+  res <- lapply(nits, FUN=function(x){
+    lapply(seq_len(n), FUN=function(j){
+      computeDeviations(se, an, background_peaks=getBackgroundPeaks(se, niterations=x))
+    })
+  })
+})
+saveRDS(res, "allDevs.rds")
+
+res2 <- lapply(res, FUN=function(res){
+  lapply(res, FUN=function(x){
+    lapply(x, FUN=function(x){
+      groups <- rep(LETTERS[1:2],each=ncol(x)/2)
+      design <- model.matrix(~groups)
+      fit <- eBayes(lmFit(assays(x)$z, design))
+      res <- as.data.frame(topTable(fit, number=Inf))
+      res$rank <- seq_len(nrow(res))
+      res
+    })
+  })
+})
+saveRDS(res2, "allRes.rds")
+res2 <- dplyr::bind_rows(lapply(res2, FUN=function(res){
+  dplyr::bind_rows(lapply(res, FUN=function(y){
+    tfs <- unique(unlist(lapply(y, FUN=function(x) head(row.names(x),20))))
+    m <- cor(sapply(y, FUN=function(x) x[tfs,"rank"]))
+    data.frame(correlation=as.numeric(m[lower.tri(m)]))
+  }), .id="niter")
+}), .id="dataset")
+res2$niter <- factor(as.integer(res2$niter))
+saveRDS(res2, "cors.rds")
+```
+
+```{r}
+means <- aggregate(res2$correlation, res2[,1:2], FUN=mean)
+se <- aggregate(res2$correlation, res2[,1:2], FUN=sd)
+se$x <- se$x/sqrt(7)
+means$upper <- means$x+se$x
+means$lower <- means$x-se$x
+ggplot(means, aes(niter, x, group=dataset)) + 
+  geom_ribbon(aes(ymax=upper, ymin=lower, fill=dataset), alpha=0.15) + 
+  geom_line(aes(colour=dataset), linewidth=1) + theme_bw() +
+  labs(y="Correlation, across random seeds, of the\nranks of the union of top 20 motifs",
+       x="Number of chromVAR background iterations used (default 50)")
+ggplot(res2, aes(factor(niter), correlation, group=dataset, colour=dataset)) + stat_summary()
+```
+
