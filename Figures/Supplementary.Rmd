@@ -25,6 +25,8 @@ suppressPackageStartupMessages({
   library(ggplot2)
   library(cowplot)
 })
+source("../Scripts/plot.R")
+source("../Scripts/runMethods.R")
 ```
 
 
@@ -67,7 +69,7 @@ cowplot::plot_grid(
 ```
 
 **`r getFigNb()` : Overview of the benchmark datasets and TFs. **
-**A:** Volcano plot of the differential accessibility analysis, illustrating the 
+**A:** Volcano plot of the differential accessibility analyses, illustrating the 
 extent and significance of changes upon treatment in each dataset. The dashed 
 line represents a 0.05 FDR threshold, and indicated are the number of ATAC peaks 
 passing this threshold, as well as the proportion of peaks with an uncorrected 
@@ -76,7 +78,7 @@ p-value lower than 0.05.
 which the datasets are named) in ATAC peaks containing the respective motifs, 
 versus all ATAC peaks. 
 **C:** Proportion of ChIPseq peaks (overlapping ATAC peaks) that contain the 
-respective motifs.
+respective motif.
 
 
 \newpage
@@ -95,8 +97,10 @@ p1 <- ggplot(means, aes(niter, x, group=dataset)) +
   geom_ribbon(aes(ymax=upper, ymin=lower, fill=dataset), alpha=0.15) + 
   geom_line(aes(colour=dataset), linewidth=1) + theme_bw() +
   labs(y="Correlation, across random seeds, of\nthe ranks of the union of top 20 motifs",
-       x="Number of chromVAR background iterations\n(default 50)") +
-  theme(legend.position="none") + coord_cartesian(expand=FALSE, ylim=c(0.5,1))
+       x="Number of chromVAR background iterations\n(default 50)",
+       title="ChromVAR ranking reproducibility") +
+  theme(legend.position="none", title=element_text(size=10)) + 
+  coord_cartesian(expand=FALSE, ylim=c(0.5,1))
 ```
 
 
@@ -141,31 +145,162 @@ p3 <- ggplot(d, aes(x=rank, y=propCoFact, ymax=propCoFact, fill=Method, colour=M
   geom_ribbon(ymin=0, alpha=0.4, linewidth=0.8) + theme_bw() +
   scale_fill_manual(values=cols) + scale_colour_manual(values=cols) +
   coord_cartesian(expand=0) + 
+  theme(title=element_text(size=10), legend.position=c(0.62,0.76),
+        panel.grid=element_blank()) +
   labs(x="Ranked motifs according to method",
-       y="Proportion of top motifs among network members")
+       y="Proportion of top motifs among network members",
+       title="Network score")
+
+
+res <- readRDS("../fullFrags/results.rds")
+res2 <- filterMethods(res)
+p4 <- ggplot(res, aes(rank, relAUC, shape=dataset, color=method)) + 
+  geom_point(show.legend = FALSE) + scale_x_log10() + theme_bw() +
+  labs(x="Rank of true TF", y="Network score (relative AUC)")
+
 ```
 
-```{r, fig.width=8, fig.height=8.5}
+```{r, fig.width=8, fig.height=8}
 plot_grid(plot_grid(p1,p2,nrow=1,labels="AUTO",scale=0.95),
-          p3,nrow=2,labels=c(NA,"C"), scale=c(1,0.95), rel_heights = c(4.5,5))
+          plot_grid(p3,p4,nrow=1,labels=LETTERS[3:4],scale=0.95),
+          nrow=2, rel_heights = c(4.5,5))
 ```
 
 
 **`r getFigNb()`** 
 **A: Reproducibility of chromVAR-based differential accessibility ananylsis.**
 Each color represents a dataset. The line and shaded area respectively represent 
-the mean and standard error of the correlation, across independent runs of the 
-chromVAR>limma pipeline, of the ranks of the (union of) top 20 motifs.
+the mean and standard error of the pairwise correlations across 7 independent 
+runs of the chromVAR>limma pipeline for each dataset and setting, of the ranks 
+of the (union of) top 20 motifs.
 **B: Illustration of the motif-specific position weights for the insertionModel method.**
-**C: Illustration of the computation of the network score** 
-The motif are ranked for each method, and for each k=1:100 the proportion of 
-top k motifs that are part of the known network of the true TF is computed. The
-example plotted here is from the GATA1 dataset. The area under the curve is then
-reported, relative to the AUC of the best possible motif ordering for that 
-factor (gray area).
+**C: Illustration of the computation of the network score.** 
+The motifs are ranked for each method, and for each k=1:100 the proportion of 
+top k motifs that are part of the known network of the true TF is computed. 
+The area under the curve is then reported, relative to the AUC of the best 
+possible motif ordering for that factor (gray area). The example plotted here is
+from the GATA1 dataset. 
+**D: Agreement between the two rank-based metrics.**
+Each point represents the results of a method (colour) in a dataset (shape).
+The network score is not entirely comparable across datasets. 
+Beside this effect, and except at very low (1-3) or high (>100) ranks (i.e. 
+where the ranks stop being discriminatory), there is a good agreement between
+the two metrics.
 
 
 \newpage
+
+
+
+# `r getFigNb(TRUE)`
+
+```{r}
+dev1 <- readRDS("/mnt/bohacek/externData/2022_Caradonna_GSE200670_stress_ATAC/motifs_deviations.rds")
+dev2 <- readRDS("/mnt/bohacek/externData/2022_Caradonna_GSE200670_stress_ATAC/aligned/resizedPeaks.sampleSubset.dev.SE.rds")
+colnames(dev2) <- gsub("\\.bam","",colnames(dev2))
+dev1 <- dev1[,colnames(dev2)]
+dev2$condition <- dev1$condition
+d <- dplyr::bind_rows(list(
+  "Called peaks"=sechm::meltSE(dev1, row.names(dev1), assayName="z"),
+  "Resized peaks"=sechm::meltSE(dev2, row.names(dev2), assayName="z")
+  ), .id="type")
+d$type <- factor(d$type, unique(d$type))
+d2 <- sechm::meltSE(dev2, row.names(dev2), assayName="deviations")
+d2$type <- "Resized peaks (deviations)"
+d <- d[,c("type","sample","condition","z")]
+d2 <- d2[,c("type","sample","condition","deviations")]
+row.names(d) <- NULL
+row.names(d2) <- NULL
+d2$sample <- factor(d2$sample)
+d$sample <- factor(d$sample)
+saveRDS(list(d=d, d2=d2), "../misc/example_distribution_shifts.rds")
+```
+
+
+```{r, fig.width=8, fig.height=8}
+p1 <- ggplot(d, aes(z, group=sample, colour=condition)) + 
+  geom_vline(xintercept=0) + 
+  geom_density(show.legend = FALSE, linewidth=1) + facet_wrap(~type, nrow=1) + 
+  theme_bw() + coord_cartesian(xlim=c(-20,20))
+p2 <- ggplot(d2, aes(deviations, group=sample, colour=condition)) + 
+  geom_vline(xintercept=0) + 
+  geom_density(show.legend = FALSE, linewidth=1) + facet_wrap(~type, nrow=1) + 
+  theme_bw() + coord_cartesian(xlim=c(-0.05,0.05))
+p0 <- plot_grid(p1,p2,nrow=1,rel_widths = c(2,1), labels=c("A","B"), scale=0.95)
+
+fl <- system("ls ../fullFrags/*/runATAC_results/with_pvalues/CV*", intern = TRUE)
+fl <- fl[grep("CVqt|CVnorm|CVcentered|CVdev\\.rds|CV\\.rds",fl)]
+fl <- fl[grep("_1h",fl,invert=TRUE)]
+ds <- basename(dirname(dirname(dirname(fl))))
+d <- data.frame(Dataset=ds, method=gsub("\\.rds","",basename(fl)))
+cv2 <- lapply(fl, readRDS)
+datasets <- getDatasets()
+d$t <- sapply(seq_along(cv2), FUN=function(i){
+  x <- cv2[[i]]
+  truth <- datasets[[ds[[i]]]]$truth
+  x[head(which(row.names(x) %in% truth),1),"t"]
+})
+d$direction <- ifelse(sapply(datasets, FUN=function(x) x$type)[d$Dataset]=="ligand",1,-1)
+d$t <- d$t*d$direction
+d$t[d$t<0] <- 0
+d2 <- reshape2::dcast(d, Dataset~method, value.var="t")
+p1 <- ggplot(d2, aes(CV, CVqt, label=Dataset, colour=factor(sign(CVqt-CV)))) + 
+        geom_abline(slope=1, colour="grey") + geom_point() + 
+        ggrepel::geom_text_repel(min.segment.length = 0) + 
+        scale_x_sqrt() + scale_y_sqrt() + theme_bw() + 
+        scale_colour_manual(values=c("-1"="red", "0"="black", "1"="darkblue")) +
+        theme(legend.position ="none", title=element_text(size=10)) +
+        labs(x="t-value in chromVAR(z)>limma",
+             y="t-value in chromVAR(z)>QtNorm>limma")
+p2 <- ggplot(d2, aes(CV, CVcentered, label=Dataset, colour=factor(sign(CVcentered-CV)))) + 
+        geom_abline(slope=1, colour="grey") + geom_point() + 
+        ggrepel::geom_text_repel(min.segment.length = 0) + 
+        scale_x_sqrt() + scale_y_sqrt() + theme_bw() + 
+        scale_colour_manual(values=c("-1"="red", "0"="black", "1"="darkblue")) +
+        theme(legend.position ="none", title=element_text(size=10)) +
+        labs(x="t-value in chromVAR(z)>limma",
+             y="t-value in chromVAR(z)>centered>limma")
+p3 <- ggplot(d2, aes(CV, CVnorm, label=Dataset, colour=factor(sign(CVnorm-CV)))) + 
+    geom_abline(slope=1, colour="grey") + geom_point() + 
+    ggrepel::geom_text_repel(min.segment.length = 0) + 
+    scale_x_sqrt() + scale_y_sqrt() + theme_bw() + 
+    scale_colour_manual(values=c("-1"="red", "0"="black", "1"="darkblue")) +
+    theme(legend.position ="none", title=element_text(size=10)) +
+    labs(x="t-value in chromVAR(z)>limma",
+         y="t-value in chromVAR(z)>scale>limma")
+
+p4 <- ggplot(d2, aes(CVdev, CVqt, label=Dataset, colour=factor(sign(CVqt-CVdev)))) + 
+    geom_abline(slope=1, colour="grey") + geom_point() + 
+    ggrepel::geom_text_repel(min.segment.length = 0) + 
+    scale_x_sqrt() + scale_y_sqrt() + theme_bw() + 
+    scale_colour_manual(values=c("-1"="red", "0"="black", "1"="darkblue")) +
+    theme(legend.position ="none", title=element_text(size=10)) +
+    labs(x="t-value in chromVAR(deviations)>limma",
+         y="t-value in chromVAR(z)>QtNorm>limma")
+
+plot_grid(p0, plot_grid(p1, p2, nrow=1, labels=LETTERS[3:4], scale=0.9),
+          plot_grid(p3, p4, nrow=1, labels=LETTERS[5:6], scale=0.9),
+          nrow=3, rel_heights=c(3,4,4))
+```
+
+**`r getFigNb()` : Differences in the chromVAR motif score distributions across samples, and impact of their normalization** 
+**A-B:** Example of a subset of ATAC samples from 
+<a href="https://doi.org/10.1016/j.ynstr.2022.100475">Caradonna, Paul and Marrocco (2022)</a> 
+(<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE200670">GSE200670</a>),
+where different samples show different shapes of motif z-scores distributions.
+When peaks are not resized to all have the same width, as recommended, the 
+distributions are often globally shifted (**A**, left). Even when peaks are 
+resized (**A**, right), differences in the width of the z-scores distributions 
+which are not related to experimental groups can persist in some datasets. This 
+is not specific to the z-scores, but also present in the bias-corrected 
+deviations (**B**).
+**C-F:** For each comparison, the limma's t-value for the true TF is reported; for datasets 
+involving a downregulation of the TF, the sign of the t-value was inverted. For 
+ease of visualization, t-values below 0 were set to zero, and the axes were 
+square-root transformed. TF in blue show an improvement, while those in red show
+a worsening, and those in black are unchanged.
+
+
 
 
 
@@ -215,9 +350,9 @@ ggplot(d, aes(transformation, smd, group=sample, colour=TF)) +
 ```
 
 **`r getFigNb()` : Impact of chromVAR motif z-score normalization at the single-cell level.** 
-As a proxy to signal-to-noise ratio, we computed the standardizeed mean 
+As a proxy to signal-to-noise ratio, we computed the standardized mean 
 difference of the respective motif for each guide RNA (individual lines) to the 
-mean control of the control guide RNA. Centering is always beneficial (Wilcoxon 
+mean of the control guide RNAs. Centering is always beneficial (Wilcoxon 
 p<`r format(wilcox.test(d$difference[d$assay=="centered"], alternative="greater")$p.value, digits=1)`),
 unit-variance scaling is often beneficial (Wilcoxon 
 p~`r format(wilcox.test(d$difference[d$assay=="scaled"], alternative="greater")$p.value, digits=1)`) 

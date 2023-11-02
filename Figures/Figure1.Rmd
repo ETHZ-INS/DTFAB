@@ -12,21 +12,23 @@ suppressPackageStartupMessages({
   library(ComplexHeatmap)
 })
 source("../Scripts/plot.R")
+source("../Scripts/runMethods.R")
 res <- readRDS("../fullFrags/results.rds")
+res <- res[res$method!="dev",]
 res <- renameMethods(res)
 ```
 
-```{r, fig.width=9, fig.height=9}
+```{r, fig.width=9, fig.height=9.5}
 h1 <- rankHeatmap2(res, doDraw=FALSE, column_title="Rank of true TF", row_names_gp=gpar(fontsize=10))
 h2 <- suppressWarnings(relAUCplot2(res, row_order=names(row_order(h1)), doDraw=FALSE,
-                  column_title="Network score"))
+                  column_title="Network score", column_order=names(column_order(h1)), sqrt=TRUE))
 h <- grid.grabExpr(draw(h1 + h2, merge=TRUE))
 res2 <- filterMethods(res, rename=FALSE)
 res2$method <- gsub(":","",res2$method)
 fig <- cowplot::plot_grid(
   h,
   plot_grid(sensFDRplot(res2), runtimePlot(res2), labels=LETTERS[2:3], nrow=1, scale=0.95),
-  nrow=2, labels=c("A",NA), scale=c(0.95,1), rel_heights = c(6,3)
+  nrow=2, labels=c("A",NA), scale=c(0.95,1), rel_heights = c(6.5,3)
 )
 fig
 ```

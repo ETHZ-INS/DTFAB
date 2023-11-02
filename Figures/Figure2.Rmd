@@ -1,0 +1,90 @@
+---
+title: "Figure 2"
+author: "Pierre-Luc Germain"
+date: "10/19/2023"
+output: html_document
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(ggplot2)
+  library(cowplot)
+  library(chromVAR)
+  library(SummarizedExperiment)
+})
+source("../Scripts/plot.R")
+source("../Scripts/runMethods.R")
+res <- readRDS("../fullFrags/results.rds")
+res <- renameMethods(res)
+```
+
+
+
+```{r}
+aTheme <- theme_bw() + theme(legend.position ="none", title=element_text(size=10), plot.title=element_text(size=10.5))
+
+CVlimma <- res[which(res$method %in% c("chromVAR(deviations)>limma","chromVAR:differentialDeviations")),]
+cv1 <- reshape2::dcast(CVlimma, formula = dataset~method, value.var = "rank")
+cv1$diffsign <- sign(cv1$`chromVAR:differentialDeviations`-cv1$`chromVAR(deviations)>limma`)
+p1 <- ggplot(cv1, aes(`chromVAR:differentialDeviations`, `chromVAR(deviations)>limma`, label=dataset, colour=factor(diffsign))) + 
+        geom_abline(slope=1, colour="grey") + geom_point() + 
+        ggrepel::geom_text_repel(min.segment.length=0, size=3.5) + 
+        scale_x_log10() + scale_y_log10() + aTheme +
+        scale_colour_manual(values=c("-1"="red", "0"="black", "1"="darkblue")) +
+        labs(x="Rank of true motif in chromVAR::differentialDeviations",
+             y="Rank of true motif in\nchromVAR(deviations)>limma") +
+        ggtitle("chromVAR>limma outperforms native\nchromVAR differential analysis")
+
+CVlimma <- res[which(res$method %in% c("chromVAR(deviations)>limma","chromVAR(z)>Qt>limma")),]
+cv1 <- reshape2::dcast(CVlimma, formula = dataset~method, value.var = "rank")
+cv1$diffsign <- sign(cv1$`chromVAR(deviations)>limma`-cv1$`chromVAR(z)>Qt>limma`)
+p2 <- ggplot(cv1, aes(`chromVAR(deviations)>limma`, `chromVAR(z)>Qt>limma`, label=dataset, colour=factor(diffsign))) + 
+        geom_abline(slope=1, colour="grey") + geom_point() + 
+        ggrepel::geom_text_repel(min.segment.length=0, size=3.5) + 
+        scale_x_log10() + scale_y_log10() + aTheme +
+        scale_colour_manual(values=c("-1"="red", "0"="black", "1"="darkblue")) +
+        labs(x="Rank of true motif in chromVAR(deviations)>limma",
+             y="Rank of true motif in\nchromVAR(z)>Qt>limma") +
+        ggtitle("Differential analysis on normalized z-scores\nis preferable to using the adjusted deviations")
+```
+
+```{r, fig.height=6, fig.width=8}
+resFoN <- readRDS("../fullOnNucFreePeaks/results.rds")
+resFoN <- renameMethods(resFoN)
+resNF <- readRDS("../nucFree/results.rds")
+resNF <- renameMethods(resNF)
+m <- merge(resFoN, resNF, by=c("dataset", "method"), suffix=c(".FoNF",".NF"))
+m <- merge(res, m, by=c("dataset","method"))
+m <- m[m$method %in% c("chromVAR(z)>limma","monaLisa.vsOthers"),]
+p3 <- plot_grid(
+ggplot(m, aes(rank, rank.FoNF, label=dataset, colour=factor(-sign(rank.FoNF-rank)))) + 
+    geom_abline(slope=1, colour="grey") + geom_point() + 
+    ggrepel::geom_text_repel(min.segment.length=0, size=3.5) + facet_wrap(~method) +
+    scale_x_log10() + scale_y_log10() + aTheme + 
+    scale_colour_manual(values=c("-1"="red", "0"="black", "1"="darkblue")) +
+    labs(x="Rank of true motif (using all fragments)", y="Rank of true motif\n(all fragments on nuc-free peaks)",
+         title="Using nucleosome-free fragments does not generally improve results"),
+  ggplot(m, aes(rank, rank.NF, label=dataset, colour=factor(-sign(rank.NF-rank)))) + 
+    geom_abline(slope=1, colour="grey") + geom_point() + 
+    ggrepel::geom_text_repel(min.segment.length=0, size=3.5) + facet_wrap(~method) +
+    scale_x_log10() + scale_y_log10() + aTheme +
+    scale_colour_manual(values=c("-1"="red", "0"="black", "1"="darkblue")) +
+    labs(x="Rank of true motif (using all fragments)", y="Rank of true motif\n(only nuc-free fragments)"),
+  nrow=2, labels=LETTERS[3:4], scale=0.95, rel_heights=c(1.1,1)
+)
+```
+
+
+```{r, fig.width=8, fig.height=8.5}
+fig <- plot_grid(
+  plot_grid(p1,p2, nrow=1, scale=0.95, labels="AUTO"),
+  p3, rel_heights=c(1,2), nrow=2
+)
+fig
+```
+
+```{r}
+pdf("Figure2.pdf", width=8, height=8.5)
+fig
+dev.off()
+```
