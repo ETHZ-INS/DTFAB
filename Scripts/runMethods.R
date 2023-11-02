@@ -337,6 +337,8 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
     DAR <- dATestedgeR(counts_control, 
                        counts_perturbed)
     
+    
+    
     # Generate required matrix of logFCs
     
     DARmat <- as.numeric(DAR$logFC)
