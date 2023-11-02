@@ -34,7 +34,7 @@ getMethods <- function(onlyTop=FALSE){
   return(c( "chromVAR", "monaLisa", "StabSel", "GSEA", "decoupleR", 
             "VIPER", "VIPERb", "msVIPER", "msVIPERb",
             "ulm", "ulmB", "ulmGC", "regreg", "regregR",
-            "BaGFoot", "MBA" ))
+            "BaGFoot", "MBA", "ATACseqTFEA" ))
 }
 
 #' Run all methods on all datasets
@@ -87,12 +87,14 @@ runAllMt <- function(datasets=getDatasets(), nthreads=3, ...){
 #' @param rndSeed The random seed
 #' @param peakWidth The peak width to enforce (default 300, use 150 for NF peaks)
 #' @param forceRerun Whether to regenerate peak counts and motif instances
+#' @param outSubfolder Subfolder in which to save the results.
 #' 
 #' @return A list of dataframes for each method (also saves them to disk)
 runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
                        methods=getMethods(), aggregation=FALSE, 
                        decoupleR_modes=c("mlm", "ulm", "udt", "wsum"),
-                       rndSeed=1997, peakWidth=300, forceRerun=FALSE){
+                       rndSeed=1997, peakWidth=300, forceRerun=FALSE,
+                       outSubfolder="runATAC_results"){
   
   methods <- match.arg(methods, several.ok = TRUE)
   
@@ -123,6 +125,7 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
     library(TFBSTools)
     library(ggplot2)
     library(epiwraps)
+    library(ATACseqTFEA)
   })
   register(MulticoreParam(8))
   
@@ -136,7 +139,8 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
   
   # Obtaining and re-sizing peaks
   peaks <- sort(rtracklayer::import(dataset$peakFile))
-  peaks <- resize(peaks, width=peakWidth, fix="center")
+  if(!is.na(peakWidth))
+    peaks <- resize(peaks, width=peakWidth, fix="center")
   peaks <- keepStandardChromosomes(peaks, pruning.mode="coarse")
   
   # Paths to the method wrappers:
@@ -144,9 +148,9 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
     source(file.path(scriptsFolder, f))
   }
   
-  dir.create(mypath("runATAC_results"), showWarnings=FALSE)
+  dir.create(mypath(outSubfolder), showWarnings=FALSE)
   for(f in c("others","raw","with_pvalues","scores_only")){
-    dir.create(mypath(f,"runATAC_results"), showWarnings=FALSE)
+    dir.create(mypath(f,outSubfolder), showWarnings=FALSE)
   }
   genome <- if(dataset$species=="h"){
     BSgenome.Hsapiens.UCSC.hg38
@@ -172,7 +176,7 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
   seqlevelsStyle(genome) <- seqStyle  
 
   # use pmoi if available
-  if(file.exists(pmoiPath <- mypath("runATAC_results/others/pmoi.rds")) && 
+  if(file.exists(pmoiPath <- mypath("others/pmoi.rds",outSubfolder)) && 
      !forceRerun){
     pmoi <- readRDS(pmoiPath)
   }else{
@@ -190,7 +194,7 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
   design <- dataset$design
   
   # Obtaining read counts if not already available
-  if(file.exists(cntsPath <- mypath("runATAC_results/others/countmatrix.rds")) &&
+  if(file.exists(cntsPath <- mypath("others/countmatrix.rds",outSubfolder)) &&
      !forceRerun){
     counts <- readRDS(cntsPath)
   }else{
@@ -290,7 +294,7 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
     }
   }
   
-  saveRDS(regulons, "./runATAC_results/others/regulons.rds")
+  saveRDS(regulons, mypath("others/regulons.rds",outSubfolder))
   
   # get normal lists of peaks per motif (for GSEA)
   
@@ -305,7 +309,7 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
     }
   }
   
-  saveRDS(genesets, "./runATAC_results/others/genesets.rds")
+  saveRDS(genesets, mypath("others/genesets.rds",outSubfolder))
   
   # Here, the names in the motifs for chromVAR and monaLisa are changed to the correct ones, as well
   
@@ -322,7 +326,7 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
   if(spec=="Mmusculus")
     motifs$NR1H3 <- readRDS(file.path(scriptsFolder, "NR1H3.PWMatrix.rds"))
   
-  saveRDS(motifs, "./runATAC_results/others/motifs.rds")
+  saveRDS(motifs, mypath("others/motifs.rds",outSubfolder))
   
   # Compute differentially accessible regions required to run monaLisa, StabSel, fGSEA, VIPER, and msVIPER 
   
@@ -346,6 +350,17 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
   
   readouts <- list()
   
+  # Run ATACseqTFEA
+  
+  if("ATACseqTFEA" %in% methods){
+    set.seed(rndSeed)
+    res <- runATACseqTFEA(readlist, pmoi)
+    saveRDS(res, mypath("raw/ATACseqTFEA_raw.rds",outSubfolder))
+    saveRDS(res$res, mypath("with_pvalues/ATACseqTFEA.rds",outSubfolder))
+    readouts$ATACseqTFEA <- res$res
+  }
+  
+  
   # Run chromVAR without normalization
   
   if ("chromVAR" %in% methods){
@@ -355,7 +370,7 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
                            m, 
                            design)
     
-    saveRDS(CV, "./runATAC_results/raw/CV_raw.rds")
+    saveRDS(CV, mypath("raw/CV_raw.rds",outSubfolder))
     
     # Select desired information from chromVAR readout
     
@@ -366,7 +381,7 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
                        p = CVsel[, "P.Value"])
     CVdf$rank = seq_along(row.names(CVdf))
     
-    saveRDS(CVdf, "./runATAC_results/with_pvalues/CV.rds")
+    saveRDS(CVdf, mypath("with_pvalues/CV.rds",outSubfolder))
     readouts$CV <- CVdf
     
     dev <- CV[[3]]
@@ -375,7 +390,7 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
     dd <- dd[order(dd$p_value),]
     colnames(dd) <- c("p","padj")
     dd$rank <- seq_len(nrow(dd))
-    saveRDS(dd, file.path("runATAC_results", "with_pvalues", "CVoriginal.rds"))
+    saveRDS(dd, file.path(outSubfolder, "with_pvalues", "CVoriginal.rds"))
     
   }
   
@@ -389,7 +404,7 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
     fit <- eBayes(lmFit(devMat, design))
     topTFs <- topTable(fit, number = Inf)
     CV <- list(topTFs, CV[[2]], dev)
-    saveRDS(CV, "./runATAC_results/raw/CVnorm_raw.rds")
+    saveRDS(CV, mypath("raw/CVnorm_raw.rds",outSubfolder))
     
     # Select desired information from chromVAR readout
     
@@ -400,7 +415,7 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
                        p = CVsel[, "P.Value"])
     CVdf$rank = seq_along(row.names(CVdf))
     
-    saveRDS(CVdf, "./runATAC_results/with_pvalues/CVnorm.rds")
+    saveRDS(CVdf, mypath("with_pvalues/CVnorm.rds",outSubfolder))
     readouts$CVnorm <- CVdf
   }
   
@@ -788,7 +803,14 @@ runCVariants <- function(datasets){
       qt <- preprocessCore::normalize.quantiles(assays(dev)$z)
       dimnames(qt) <- dimnames(assays(dev)$z)
       assays(dev)$qt <- qt
-      ass <- c("CV"="z", "CVcentered"="centered", "CVnorm"="norm", "CVqt"="qt")
+      assays(dev)$devnorm <- scale(assays(dev)$deviations)
+      assays(dev)$devcentered <- scale(assays(dev)$deviations, scale=FALSE)
+      qt <- preprocessCore::normalize.quantiles(assays(dev)$deviations)
+      dimnames(qt) <- dimnames(assays(dev)$deviations)
+      assays(dev)$devqt <- qt
+      
+      ass <- c("CV"="z", "CVcentered"="centered", "CVnorm"="norm", "CVqt"="qt",
+               "CVdev"="deviations", "CVdevNorm"="devnorm", "CVdevCentered"="devcentered", "CVdevqt"="devqt" )
       design <- c(rep(-1, ncol(dev)/2), rep(1, ncol(dev)/2))
       for(f in names(ass)){
         devMat <- assays(dev)[[ass[[f]]]]
