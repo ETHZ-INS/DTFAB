@@ -1,0 +1,61 @@
+---
+title: "Aggregation"
+date: "11/2/2023"
+output: html_document
+---
+
+```{r}
+source("../Scripts/runMethods.R")
+source("../Scripts/aggregation.R")
+allints <- readRDS("../Scripts/allInteractors.rds")
+```
+
+```{r}
+getResults <- function(datasets, methods=c("CVqt","ML"), ...){
+  lapply(setNames(names(datasets),names(datasets)), FUN=function(x){
+    print(x)
+    res <- lapply(setNames(methods, methods), FUN=function(y){
+      readRDS(file.path("..","fullFrags",x,"runATAC_results","with_pvalues",paste0(y,".rds")))
+    })
+    ag <- runAggregations(res)#, ...)
+    truth <- x
+    if(!is.null(datasets[[x]]$truth)) truth <- datasets[[x]]$truth
+    out <- lapply(list(original=res, aggregated=ag), FUN=function(res){
+      lapply(res, truth=truth, interactors=allints, FUN=.getBenchmarkMetrics)
+    })
+  })
+}
+```
+
+
+```{r}
+bml <- getResults(getDatasets(), methods=c("CVqt","MLStabSel"))
+bml2 <- dplyr::bind_rows(lapply(bml, FUN=function(x){
+  dplyr::bind_rows(lapply(x, FUN=function(y) dplyr::bind_rows(y, .id="method")),
+                   .id="type")
+}), .id="dataset")
+bml2$type <- factor(bml2$type, c("original","aggregated"), c("original methods", "aggregation methods"))
+saveRDS(bml2, "CV_stabSel_aggregated.bm.rds")
+
+
+bml <- getResults(getDatasets())
+bml2 <- dplyr::bind_rows(lapply(bml, FUN=function(x){
+  dplyr::bind_rows(lapply(x, FUN=function(y) dplyr::bind_rows(y, .id="method")),
+                   .id="type")
+}), .id="dataset")
+bml2$type <- factor(bml2$type, c("original","aggregated"), c("original methods", "aggregation methods"))
+saveRDS(bml2, "aggregated.bm.rds")
+```
+
+
+```{r}
+rankBreaks=c(1,6,20,50,100,200,400)
+ggplot(bml2, aes(reorder(method,-sqrt(rank)), reorder(dataset, -sqrt(rank)), fill=sqrt(rank), label=rank)) + geom_tile() + 
+  facet_wrap(~type, scales="free_x") + geom_text() + theme_minimal() +
+  theme(legend.position="bottom", legend.key.width = unit(1,"cm"), panel.grid = element_blank(),
+            axis.text.x=element_text(angle=45, hjust=1, vjust=1)) +
+  scale_fill_viridis_c(direction=-1, breaks=sqrt(rankBreaks), 
+                       trans="sqrt", labels=c("top",rankBreaks[-1])) +
+  labs(x="", y="", fill="rank of \ntrue motif   ")
+```
+
