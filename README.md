@@ -5,7 +5,7 @@
 Wrappers and higher-level functions are located in the `Scripts` folder.
 Figures and downstream analyses are in the `Figures` folder.
 
-Each other folder represents a benchmark processed separately:
+The following folders each represent a benchmark processed separately:
 
 * **fullFrags**: benchmark on real datasets, using all fragments
 * **nucFree**: benchmark on real datasets, using only nucleosome-free fragments
