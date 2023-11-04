@@ -25,8 +25,8 @@ runmonaLisa <- function(DAR, motifs, peaks, genome, nBins=11, minAbsLfc=0.3,
   # BinDensity <- plotBinDensity(peaks$peak_FC,
   #               bins)
 
-  DARseqs <- getSeq(genome, 
-                    peaks) # This is how they got sequences. I will also try it with our sequences from PLs motif prep.
+  DARseqs <- getSeq(genome, peaks)
+  if(!is.null(names(peaks))) names(DARseqs) <- names(peaks)
   
   # Checking Biases via visualization
   
@@ -49,7 +49,7 @@ runmonaLisa <- function(DAR, motifs, peaks, genome, nBins=11, minAbsLfc=0.3,
   # Calculate bin-level p-values based on Simes method with code from 
   # https://github.com/markrobinsonuzh/DAMEfinder/blob/master/R/simes_pval.R
   simes <- function(pval){ 
-    min((length(pval)*pval[order(pval)])/seq(from = 1, to = length(pval), by = 1))
+    min((length(pval)*pval[order(pval)])/seq(from=1, to=length(pval), by=1))
   }
   
   ML <- se

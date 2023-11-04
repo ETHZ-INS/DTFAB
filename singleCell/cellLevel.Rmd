@@ -120,3 +120,27 @@ plotTF(e, "GATA1")
 plotTF(e, "GATA2")
 ```
 
+
+
+# Fragment length distributions
+
+```{r, eval=FALSE}
+frags <- data.table::fread("/mnt/plger/datasets/spearATAC_GSE168851/GSM5171460_scATAC_K562_TimeCourse_Day3.fragments.tsv.gz")
+frags <- data.frame(barcode=factor(frags$V4), len=frags$V3-frags$V2)
+se <- readRDS("/mnt/plger/datasets/spearATAC_GSE168851/GSE168851_scATAC_K562_TimeCourse_Peak_Matrix_SE.rds")
+se <- se[,se$Sample=="K562_D3"]
+colnames(se) <- gsub("K562_D3#","",colnames(se),fixed=TRUE)
+props <- rowsum(data.frame(NF=as.integer(frags$len<120),total=rep(1L,nrow(frags))),frags$barcode)
+props <- props[colnames(se),]
+CD <- colData(se)
+CD$propNF <- props$NF/props$total
+saveRDS(CD, "/mnt/plger/datasets/spearATAC_GSE168851/D3.colDat.rds")
+```
+
+
+```{r}
+CD <- readRDS("/mnt/plger/datasets/spearATAC_GSE168851/D3.colDat.rds")
+p <- ggplot(as.data.frame(CD), aes(propNF,NucleosomeRatio)) + geom_point()
+ggExtra::ggMarginal(p, type = "histogram")
+```
+

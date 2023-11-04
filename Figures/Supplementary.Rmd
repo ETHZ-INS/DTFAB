@@ -69,11 +69,11 @@ cowplot::plot_grid(
 ```
 
 **`r getFigNb()` : Overview of the benchmark datasets and TFs. **
-**A:** Volcano plot of the differential accessibility analyses, illustrating the 
-extent and significance of changes upon treatment in each dataset. The dashed 
-line represents a 0.05 FDR threshold, and indicated are the number of ATAC peaks 
-passing this threshold, as well as the proportion of peaks with an uncorrected 
-p-value lower than 0.05. 
+**A:** Volcano plot of the peak-level differential accessibility analyses, 
+illustrating the extent and significance of changes upon treatment in each dataset.
+The dashed line represents a 0.05 FDR threshold, and indicated are the number of
+ATAC peaks passing this threshold, as well as the proportion of peaks with an 
+uncorrected p-value lower than 0.05. 
 **B:** Enrichment for experimental binding sites of the factor (main TF after 
 which the datasets are named) in ATAC peaks containing the respective motifs, 
 versus all ATAC peaks. 
@@ -116,7 +116,7 @@ p2 <- ggplot(m[m$Motif %in% c("FOXO1","SOX2", "CTCF"),], aes(Position, value, co
   geom_line(linewidth=0.9) + theme_bw() + 
   labs(x="Position around motif center", y="Weight",
        title="Position weights based on insertion sites\naround the motif in the whole dataset") +
-  theme(legend.position=c(0.85,0.8), panel.grid.major=element_blank(), title=element_text(size=10),
+  theme(legend.position=c(0.84,0.78), panel.grid.major=element_blank(), title=element_text(size=10),
         panel.grid.minor=element_blank()) + coord_cartesian(expand=FALSE)
 ```
 
@@ -358,3 +358,58 @@ unit-variance scaling is often beneficial (Wilcoxon
 p~`r format(wilcox.test(d$difference[d$assay=="scaled"], alternative="greater")$p.value, digits=1)`) 
 but sometimes detrimental, and quantile normalization also tends to be beneficial 
 (Wilcoxon p~`r format(wilcox.test(d$difference[d$assay=="quantile"], alternative="greater")$p.value, digits=2)`).
+
+
+
+
+
+# `r getFigNb(TRUE)`
+
+```{r, fig.width=5, fig.height=7}
+bml2 <- readRDS("../misc/aggregated.bm.rds")
+bml2$method <- gsub("ML","monaLisa",bml2$method)
+bml2$method <- gsub("CVqt","chromVAR",bml2$method)
+bml2$trueQ[is.na(bml2$trueQ)] <- 1
+rankBreaks=c(1,6,20,50,100,200,400)
+p1 <- ggplot(bml2, aes(reorder(method,-sqrt(rank)), reorder(dataset, -sqrt(rank)), fill=sqrt(rank), label=rank)) + geom_tile() + 
+  facet_wrap(~type, scales="free_x") + geom_text() + theme_minimal() +
+  theme(panel.grid = element_blank(),
+            axis.text.x=element_text(angle=45, hjust=1, vjust=1)) +
+  scale_fill_viridis_c(direction=-1, breaks=sqrt(rankBreaks), 
+                       trans="sqrt", labels=c("top",rankBreaks[-1])) +
+  labs(x="", y="", fill="rank of \ntrue motif   ")
+
+plot_grid(p1, sensFDRplot(bml2) + coord_cartesian(ylim=c(0,0.65), xlim=c(0,1), expand=FALSE),
+          nrow=2, labels="AUTO", scale=0.95)
+```
+
+**`r getFigNb()` : Simple aggregation of top methods' results does not improve inferences.**
+The results of the top method from each of the two families of approach (on the left) 
+are compared to those of simple aggregation methods (on the right). Beside the
+established Fisher's, Stouffer's and Simes' methods, a rank-based permutation approach
+was tested, establishing the probability of having a sum of ranks across methods 
+lower or equal to the observed one.
+
+
+
+
+
+
+
+```{r, fig.width=4, fig.height=7}
+densities <- data.frame(sample=c("NFKB.1","NFKB.2","Scrambled.1","Scrambled.1","DMSO"),
+                        condition=c("NFKB","NFKB","Scrambled","Scrambled","DMSO"),
+                        value=c(3674.397, 4182.298, 6229.71, 6157.883, 8588.919))
+densities$condition <- factor(densities$condition, c("DMSO", "Scrambled","NFKB"))
+densities$value <- densities$value/densities[which(densities$sample=="DMSO"),"value"]
+dag <- aggregate(densities[,3,drop=FALSE],densities[,2,drop=FALSE],FUN=mean)
+pd <- ggplot(dag, aes(condition, value)) + 
+  geom_col(width=0.6, fill="deepskyblue4") + 
+  stat_summary(data=densities, fun.data = "mean_se", geom = "errorbar", width=0.3, linewidth=1) + 
+  theme_bw() + coord_cartesian(ylim=c(0,1)) +
+  labs(y="p50/NFkB1 density ratio to GAPDH,\nas a proportion to DMSO")
+  
+plot_grid( ggdraw() + draw_image("traftac_WB.png") + coord_cartesian(expand=0),
+           pd, nrow=2, labels="AUTO")
+```
+

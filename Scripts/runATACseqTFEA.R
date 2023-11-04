@@ -7,7 +7,7 @@ runATACseqTFEA <- function(bams, pmoi){
   res2 <- res$resultsTable
   colnames(res2)[4:5] <- c("p","padj")
   set.seed(123)
-  res2 <- res2[order(res2$p_value, -abs(res2$normalizedEnrichmentScore),
+  res2 <- res2[order(res2$p, -abs(res2$normalizedEnrichmentScore),
                      sample.int(nrow(res2))),]
   res2$rank <- seq_len(nrow(res2))
   runtime <- proc.time()-ptm

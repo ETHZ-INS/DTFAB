@@ -14,8 +14,8 @@ runStabSel <- function(DAR,
   
   # Obtaining the sequences for differentially accessible regions
   
-  DARseqs <- getSeq(genome, 
-                  peaks)
+  DARseqs <- getSeq(genome, peaks)
+  if(!is.null(names(peaks))) names(DARseqs) <- names(peaks)
   
   # Finding motif hits within the differentially accessible regions.
   

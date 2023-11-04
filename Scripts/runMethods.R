@@ -83,7 +83,6 @@ runAllMt <- function(datasets=getDatasets(), nthreads=3, ...){
 #' @param methods The methods to run (default all). Use `getMethods(onlyTop=TRUE)`
 #'   to run only the top methods.
 #' @param decoupleR_modes The decoupleR methods (beside consensus) to run.
-#' @param aggregation Whether or not to run the aggregations.
 #' @param rndSeed The random seed
 #' @param peakWidth The peak width to enforce (default 300, use 150 for NF peaks)
 #' @param forceRerun Whether to regenerate peak counts and motif instances
@@ -91,10 +90,9 @@ runAllMt <- function(datasets=getDatasets(), nthreads=3, ...){
 #' 
 #' @return A list of dataframes for each method (also saves them to disk)
 runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
-                       methods=getMethods(), aggregation=FALSE, 
+                       methods=getMethods(), rndSeed=1997, peakWidth=300, 
                        decoupleR_modes=c("mlm", "ulm", "udt", "wsum"),
-                       rndSeed=1997, peakWidth=300, forceRerun=FALSE,
-                       outSubfolder="runATAC_results"){
+                       forceRerun=FALSE, outSubfolder="runATAC_results"){
   
   methods <- match.arg(methods, several.ok = TRUE)
   

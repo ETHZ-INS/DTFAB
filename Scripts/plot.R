@@ -43,12 +43,15 @@ rankHeatmap2 <- function(res, rankBreaks=c(1,5,25,75,150,300,600), ...,
 sensFDRplot <- function(res){
   res$Sensitivity <- res$trueQ<0.05
   res$FDR[which(is.na(res$FDR))] <- 0
-  res$type <- ifelse(grepl("GSEA|ulm|msViper|decoupleR|MonaLisa|diffTF|-lm|Lasso",
-                           res$method, ignore.case=TRUE), "LFC-based", "sample-wise")
+  if(is.null(res$type)){
+    res$type <- ifelse(grepl("GSEA|ulm|msViper|decoupleR|MonaLisa|diffTF|-lm|Lasso",
+                             res$method, ignore.case=TRUE), "LFC-based", "sample-wise")
+  }
+  cols <- setNames(c("#CC6677", "#4477AA"), unique(res$type))
   res2 <- aggregate(res[,c("Sensitivity", "FDR")], by=res[,c("method","type")], mean)
   ggplot(res2, aes(FDR, Sensitivity, label=method, colour=type)) + geom_point(show.legend=FALSE) + 
     theme_bw() + ggrepel::geom_text_repel(min.segment.length=0, show.legend=FALSE) +
-    scale_color_manual(values=c("LFC-based"="#CC6677", "sample-wise"="#4477AA")) +
+    scale_color_manual(values=cols) +
     theme(legend.position = "bottom")
 }
 

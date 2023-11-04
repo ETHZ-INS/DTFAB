@@ -1,0 +1,31 @@
+---
+title: "CV_distributions"
+author: "Pierre-Luc Germain"
+date: "10/29/2023"
+output: html_document
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(chromVAR)
+  library(SummarizedExperiment)
+})
+source("../Scripts/runMethods.R")
+```
+
+```{r}
+setwd("../fullFrags/BANP")
+ds <- getDatasets()[c("BANP","GATA1","NR1H3")]
+res <- runMethods(ds[[1]], outSubfolder="noResize", methods = "chromVAR", peakWidth = NA)
+```
+
+
+```{r}
+ses <- lapply(ds, FUN=function(x){
+  se <- readRDS(paste0("../fullFrags/",x,"/runATAC_results/others/countmatrix.rds"))
+})
+"BANP"  "GATA1" "NR1H3"
+ggplot(meltSE(a, row.names(a), assayName = "z"), aes(z,colour=condition)) + geom_density() + theme(legend.position = "none") + theme_bw()
+
+```
+
