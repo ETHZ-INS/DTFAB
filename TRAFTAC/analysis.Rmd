@@ -1,0 +1,182 @@
+---
+title: "TRAFTAC"
+date: "11/2/2023"
+output: html_document
+---
+
+```{r setup}
+suppressPackageStartupMessages({
+  library(BiocParallel)
+  library(chromVAR)
+  library(SummarizedExperiment)
+  library(motifmatchr)
+  library(monaLisa)
+  library(sechm)
+  library(limma)
+  library(ggplot2)
+})
+source("../Scripts/getpmoi.R")
+source("../Scripts/runStabSel.R")
+genome <- Rsamtools::FaFile("/reference/Homo_sapiens/Ensembl/GRCh38.p10/Sequence/WholeGenomeFasta/Homo_sapiens.GRCh38.dna.toplevel.fa")
+```
+
+## chromVAR
+
+```{r, eval=FALSE}
+se <- readRDS("peakCounts.SE.rds")
+
+mm <- model.matrix(~se$condition)
+se <- se[edgeR::filterByExpr(assay(se),mm),]
+row.names(se) <- as.character(granges(se))
+
+dds <- calcNormFactors(DGEList(assay(se), group=se$condition))
+dds <- estimateDisp(dds,mm)
+res <- as.data.frame(topTags(glmLRT(glmFit(dds,mm),coef="se$conditionNFkB"), Inf))
+rowData(se)$DEA.nfkp <- res[row.names(se),]
+saveRDS(se, "peakCounts.SE.rds")
+
+motifs <- getNonRedundantMotifs(species="Hsapiens")
+moi <- motifmatchr::matchMotifs(motifs, subject=se, genome=genome)
+set.seed(1234)
+dev <- chromVAR::computeDeviations(object=se, annotations=moi,
+                                   background_peaks=getBackgroundPeaks(se, niterations=2000))
+q <- preprocessCore::normalize.quantiles(assay(dev))
+dimnames(q) <- dimnames(dev)
+assays(dev)$qt <- q
+dev2 <- dev[!grepl(":",row.names(dev),fixed=TRUE) & !grepl("var.2",row.names(dev),fixed=TRUE),]
+fit <- eBayes(lmFit(assays(dev2)$z, mm))
+res <- as.data.frame(topTable(fit, coef="se$conditionNFkB", number = Inf))
+res$TF <- row.names(res)
+rowData(dev) <- res[row.names(dev),]
+saveRDS(dev, file="deviations.SE.rds")
+```
+
+```{r}
+dev <- readRDS("deviations.SE.rds")
+cv <- as.data.frame(rowData(dev))
+cv$absMaxDeviation <- matrixStats::rowMaxs(abs(assays(dev)$deviations))
+cv$absMaxZ <- matrixStats::rowMaxs(abs(assays(dev)$z))
+cv <- cv[order(cv$P.Value),]
+cv2 <- cv[which(abs(cv$logFC)>4.8 & cv$adj.P.Val<0.2 & cv$absMaxDeviation>0.0122),]
+ggplot(cv, aes(absMaxDeviation, logFC, colour=-log10(adj.P.Val), label=TF)) +
+  geom_point() + scale_color_viridis_c(option="A",direction=-1) + theme_bw() +
+  geom_point(data=cv[grep("NFKB",row.names(cv)),], size=5, shape=1, alpha=1, colour="darkred") +
+  ggrepel::geom_text_repel(data=cv2, min.segment.length=0, max.overlaps=30, show.legend=FALSE) +
+  labs(x="Maximum absolute chromVAR deviation", y="Motif log2(foldchange)")
+```
+
+```{r}
+metadata(dev)$anno_colors <- list(condition=c("Ctrl"="lightgrey", "NFkB"="darkred"))
+sechm(dev, row.names(cv2), assayName = "z", do.scale = TRUE)
+```
+
+
+## monaLisa
+
+```{r, eval=FALSE}
+se <- readRDS("peakCounts.SE.rds")
+se <- keepStandardChromosomes(se, "Homo_sapiens", pruning.mode="coarse")
+da <- rowData(se)$DEA.nfkp
+motifs <- getNonRedundantMotifs(species="Hsapiens", format="PWMatrix")
+peaks <- granges(se)
+names(peaks) <- row.names(se)
+
+peaks$logFC <- jitter(da[names(peaks),"logFC"], 0.001) # To avoid non-unique breaks
+fc2 <- peaks$logFC[which(abs(peaks$logFC)>=0.2)]
+bins <- monaLisa::bin(x=peaks$logFC, 
+                      binmode = "equalN", 
+                      nElements = ceiling(length(fc2)/10),
+                      minAbsX = 0.2)
+  
+#plotBinDensity(peaks$logFC, bins)
+
+DARseqs <- getSeq(genome, peaks)
+names(DARseqs) <- names(peaks)
+  
+plotBinDiagnostics(seqs=DARseqs, bins=bins, aspect="dinucfreq")
+# strong GC-bias...
+  
+mlse <- calcBinnedMotifEnrR(seqs = DARseqs, 
+                            bins = bins, 
+                            pwmL = motifs, 
+                            BPPARAM = BiocParallel::MulticoreParam(8),
+                            background = "otherBins")
+  
+simes <- function(pval){ 
+  min((length(pval)*pval[order(pval)])/seq(from=1, to=length(pval), by=1))
+}
+MLp <- 10^-assays(mlse)$negLog10P[,-which(colData(mlse)$bin.nochange)]
+rowData(mlse)$simes.p <- apply(MLp, 1, simes)
+rowData(mlse)$simes.padj <- p.adjust(rowData(mlse)$simes.p, method="fdr")
+mlse <- mlse[order(rowData(mlse)$simes.p),]
+saveRDS(mlse, "monaLisa.SE.rds")
+
+mlse <- calcBinnedMotifEnrR(seqs = DARseqs, 
+                            bins = bins, 
+                            pwmL = motifs, 
+                            BPPARAM = BiocParallel::MulticoreParam(8),
+                            background = "zeroBin")
+  
+simes <- function(pval){ 
+  min((length(pval)*pval[order(pval)])/seq(from=1, to=length(pval), by=1))
+}
+MLp <- 10^-assays(mlse)$negLog10P[,-which(colData(mlse)$bin.nochange)]
+rowData(mlse)$simes.p <- apply(MLp, 1, simes)
+rowData(mlse)$simes.padj <- p.adjust(rowData(mlse)$simes.p, method="fdr")
+mlse <- mlse[order(rowData(mlse)$simes.p),]
+saveRDS(mlse, "monaLisa.vsZero.SE.rds")
+```
+
+```{r}
+mlse <- readRDS("monaLisa.SE.rds")
+plotMotifHeatmaps(x=head(mlse,10), which.plots=c("log2enr", "negLog10P"), 
+                  width = 2.0, cluster = TRUE)
+```
+
+## Comparison of the two
+
+```{r}
+cv$ml.p <- rowData(mlse)[row.names(cv),"simes.p"]
+ggplot(cv, aes(-log10(P.Value), -log10(ml.p), colour=abs(logFC))) + geom_point() + 
+  scale_colour_viridis_c(direction=-1) + theme_bw() + 
+  labs(x="chromVAR -log10(p-value)", y="monaLisa -log10(p-value)")
+```
+
+
+## Stability selection
+
+```{r}
+se <- readRDS("peakCounts.SE.rds")
+se <- keepStandardChromosomes(se, "Homo_sapiens", pruning.mode="coarse")
+da <- rowData(se)$DEA.nfkp
+motifs <- getNonRedundantMotifs(species="Hsapiens", format="PWMatrix")
+peaks <- granges(se)
+names(peaks) <- row.names(se)
+peaks$logFC <- jitter(da[names(peaks),"logFC"], 0.001) # To avoid non-unique breaks
+library(BiocParallel)
+ss <- runStabSel(da, motifs, peaks, genome)
+ss <- ss$res
+saveRDS(ss, file="stabSel.rds")
+selected <- intersect(colnames(ss)[which(ss$selProb>=0.9)],row.names(mlse))
+saveRDS(selected, file="stabSel.selected.rds")
+
+plotMotifHeatmaps(x = mlse[selected,],
+                  which.plots = c("log2enr", "negLog10P"), 
+                  width = 2.0, cluster = TRUE, 
+                  show_motif_GC = TRUE, show_seqlogo = TRUE)
+```
+
+```{r, fig.width=8, fig.height=5}
+uMo <- setdiff(intersect(union(selected, row.names(cv2)), row.names(mlse)), "NF2L1") # infinite value for that genes causes error
+hl <- plotMotifHeatmaps(x = mlse[uMo,],
+                  which.plots = c("log2enr"), width.seqlogo=2,
+                  width = 1.25, cluster = TRUE, doPlot=FALSE, column_title_gp=gpar(fontsize=11),
+                  show_motif_GC = TRUE, show_seqlogo = TRUE,
+                  row_names_gp=gpar(fontsize=9))
+draw(
+  Reduce("+",hl) + sechm(dev, uMo, assayName = "z", do.scale=TRUE, 
+                       column_title_gp=gpar(fontsize=11), column_title="chromVAR",
+                       width=unit(0.7, "in"), row_names_gp=gpar(fontsize=9)),
+  merge=TRUE)
+```
+

@@ -1,0 +1,77 @@
+---
+title: "Figure 4"
+date: "11/4/2023"
+output: html_document
+---
+
+```{r setup}
+suppressPackageStartupMessages({
+  library(sechm)
+  library(monaLisa)
+  library(ggplot2)
+  library(cowplot)
+})
+```
+
+```{r}
+dev <- readRDS("../TRAFTAC/deviations.SE.rds")
+metadata(dev)$anno_colors <- list(condition=c("Ctrl"="lightgrey", "NFkB"="darkred"))
+
+cv <- as.data.frame(rowData(dev))
+cv$absMaxDeviation <- matrixStats::rowMaxs(abs(assays(dev)$deviations))
+cv$absMaxZ <- matrixStats::rowMaxs(abs(assays(dev)$z))
+cv <- cv[order(cv$P.Value),]
+# label motifs with decent abs(dev), large logFC and smallish adj.p...
+cv2 <- cv[which(abs(cv$logFC)>4.8 & cv$adj.P.Val<0.2 & cv$absMaxDeviation>0.0122),]
+p1 <- ggplot(cv, aes(absMaxDeviation, logFC, colour=-log10(adj.P.Val), label=TF)) +
+  geom_point() + scale_color_viridis_c(option="A",direction=-1) + theme_bw() +
+  geom_point(data=cv[grep("NFKB",row.names(cv)),], size=5, shape=1, alpha=1, colour="darkred") +
+  ggrepel::geom_text_repel(data=cv2, min.segment.length=0, max.overlaps=30, show.legend=FALSE) +
+  labs(x="Maximum absolute chromVAR deviation", y="Motif log2(foldchange) with TRAFTAC") +
+  theme(legend.position = "bottom")
+```
+
+
+```{r}
+mlse <- readRDS("../TRAFTAC/monaLisa.SE.rds")
+cv$ml.p <- rowData(mlse)[row.names(cv),"simes.p"]
+wNoZ <- which(!mlse$bin.nochange)
+mlp <- (1-10^-assay(mlse,"negLog10P")[,wNoZ])
+cv$ml.enr <- rowSums(assay(mlse,"log2enr")[,wNoZ])/rowSums(mlp)
+cv$TF <- row.names(cv)
+# geometric mean p-value <0.01
+w <- which( (-log10(cv$ml.p) + -log10(cv$P.Value))>4)
+p2 <- ggplot(cv, aes(-log10(P.Value), -log10(ml.p), colour=abs(logFC), label=TF)) + 
+  geom_point() + scale_colour_viridis_c(direction=-1) + theme_bw() + 
+  ggrepel::geom_text_repel(data=cv[w,]) + theme(legend.position = "bottom") +
+  labs(x="chromVAR -log10(p-value)", y="monaLisa -log10(p-value)", colour="chromVAR abs(logFC)")
+```
+
+```{r, fig.height=5, fig.width=8}
+selected <- readRDS("../TRAFTAC/stabSel.selected.rds")
+uMo <- setdiff(intersect(union(selected, row.names(cv2)), row.names(mlse)), "NF2L1") # infinite value for that genes causes error
+hl <- plotMotifHeatmaps(x = mlse[uMo,],
+                  which.plots = c("log2enr","negLog10P"), width.seqlogo=2,
+                  width = 1.25, cluster = TRUE, doPlot=FALSE,
+                  column_title_gp=gpar(fontsize=11),
+                  show_motif_GC = FALSE, show_seqlogo = TRUE)
+hl$chromVAR <- sechm(dev, uMo, assayName = "z", do.scale=TRUE, 
+                       column_title_gp=gpar(fontsize=11), column_title="chromVAR",
+                       width=unit(0.7, "in"), row_names_gp=gpar(fontsize=10))
+p3 <- grid.grabExpr(draw(Reduce("+",hl), merge=TRUE))
+```
+
+
+```{r, fig.height=9, fig.width=9}
+# why do suddenly half of the motifs disappear???
+pp <- plot_grid(
+  plot_grid(p1,p2,nrow=1,labels="AUTO",scale=0.95),
+  p3, 
+  nrow=2, rel_heights=c(4,5.5), labels=c(NA,"C")
+)
+pp
+pdf("Figure4.pdf", height=8.5, width=8.5)
+pp
+dev.off()
+```
+
