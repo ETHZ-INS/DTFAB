@@ -180,3 +180,29 @@ draw(
   merge=TRUE)
 ```
 
+## Checking the insertion profile of some candidates
+
+```{r, fig.width=8.5, fig.height=6}
+motifs <- getNonRedundantMotifs(species="Hsapiens")[c("NFKB1",uMo)]
+moi <- motifmatchr::matchMotifs(motifs, subject=se, genome=genome, out="positions")
+tracks <- list.files("/mnt/plger/datasets/2023_nfkbTraftac_ATAC/tracks/", full=TRUE)
+names(mos) <- mos <- c("FOS", "NFKB1", "BACH2", "NFE2", "BHE40", "NF2L2")
+d <- dplyr::bind_rows(lapply(mos, FUN=function(x){
+  epiwraps::meltSignals(epiwraps::signal2Matrix(tracks, regions=moi[[x]], extend=1000L, w=5L))
+}), .id="Motif")
+d$condition <- d$sample
+levels(d$condition) <- ifelse(grepl("Ctrl",levels(d$condition)), "CTRL", "NFKB-KD")
+ggplot(d, aes(position, mean, group=sample, colour=condition)) + geom_line(linewidth=0.75) + 
+  facet_wrap(~Motif, nrow=2, scales="free_y") +
+  theme_bw() + theme(legend.position = "none")
+d2 <- dplyr::bind_rows(lapply(split(d, paste(d$Motif,d$sample)), FUN=function(x){
+  x$sm.mean <- as.numeric(smooth(x$mean, twiceit = FALSE))
+  x
+}))
+ggplot(d2, aes(position, sm.mean, group=sample, colour=condition)) + geom_line(linewidth=0.75) + 
+  facet_wrap(~Motif, nrow=2, scales="free_y") +
+  theme_bw() + theme(legend.position = "bottom") + scale_x_continuous(expand=expansion()) +
+  labs(x="Position around motif", y="Normalized insertion sites density")
+
+```
+
