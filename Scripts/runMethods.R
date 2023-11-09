@@ -30,7 +30,8 @@ getDatasets <- function(onlyPE=FALSE){
 #' @param onlyTop Logical, whether to get only the top methods
 getMethods <- function(onlyTop=FALSE){
   if(onlyTop)
-    return(c("chromVAR", "monaLisa", "StabSel", "msVIPERb", "VIPER", "ulm"))
+    return(c("chromVAR", "minaLisa.others", "monaLisa.zero", "StabSel", 
+             "msVIPER", "MBA"))
   return(c( "chromVAR", "monaLisa", "StabSel", "GSEA", "decoupleR", 
             "VIPER", "VIPERb", "msVIPER", "msVIPERb",
             "ulm", "ulmB", "ulmGC", "regreg", "regregR",
@@ -433,7 +434,7 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
   
   # Run monaLisa 
   
-  if ("monaLisa" %in% methods){
+  if ("monaLisa" %in% methods || "minaLisa.zero" %in% methods){
     
     ML <- runmonaLisa(DAR, 
                       motifs, 
@@ -443,7 +444,9 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
     saveRDS(ML$df, "./runATAC_results/with_pvalues/MLzero.rds")
     readouts$MLzero <- ML$df
     
-    
+  }
+  if ("monaLisa" %in% methods || "minaLisa.others" %in% methods){
+
     set.seed(rndSeed)
     ML <- runmonaLisa(DAR, 
                       motifs, 
@@ -453,7 +456,9 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
     saveRDS(ML, "./runATAC_results/raw/ML_raw.rds")
     saveRDS(ML$df, "./runATAC_results/with_pvalues/ML.rds")
     readouts$ML <- ML$df
-
+  }
+  
+  if ("monaLisa" %in% methods){
     set.seed(rndSeed)
     ML <- runmonaLisa(DAR, 
                       motifs, 
@@ -470,7 +475,6 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
     saveRDS(ML, "./runATAC_results/raw/MLfewerBins_raw.rds")
     saveRDS(ML$df, "./runATAC_results/with_pvalues/MLfewerBins.rds")
 
-    
     # use correlation across bins
     MLdf <- readouts$ML
     MLdf <- MLdf[order(abs(MLdf$binSpearman)*-log10(MLdf$p), decreasing=TRUE),]
