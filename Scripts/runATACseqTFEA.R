@@ -12,6 +12,6 @@ runATACseqTFEA <- function(bams, pmoi){
   res2$rank <- seq_len(nrow(res2))
   runtime <- proc.time()-ptm
   
-  return(list(res=res2, runtime=runtime, obj1=res))
+  return(list(res=res2, runtime=runtime))
 }
 
