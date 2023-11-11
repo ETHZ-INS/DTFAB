@@ -1,14 +1,14 @@
-rankHeatmap <- function(res, rankBreaks=c(1,6,20,50,100,200,400), squeeze=FALSE){
-  p <- ggplot(res, aes(reorder(dataset,-sqrt(rank)), reorder(method,-sqrt(rank)),
-                  fill=sqrt(rank), label=rank)) + geom_tile() +  geom_text() +
-    scale_fill_viridis_c(direction=-1, breaks=sqrt(rankBreaks), 
-                         trans="sqrt", labels=c("top",rankBreaks[-1])) +
-    labs(fill="Rank of\ntrue TF", y="Methods", x="Datasets") + theme_minimal()
-  if(squeeze) p <- p + 
-      theme(legend.position="bottom", legend.key.width = unit(1,"cm"),
-            axis.text.x=element_text(angle=45, hjust=1, vjust=1))
-  p
-}
+# rankHeatmap <- function(res, rankBreaks=c(1,6,20,50,100,200,400), squeeze=FALSE){
+#   p <- ggplot(res, aes(reorder(dataset,-sqrt(rank)), reorder(method,-sqrt(rank)),
+#                   fill=sqrt(rank), label=rank)) + geom_tile() +  geom_text() +
+#     scale_fill_viridis_c(direction=-1, breaks=sqrt(rankBreaks), 
+#                          trans="sqrt", labels=c("top",rankBreaks[-1])) +
+#     labs(fill="Rank of\ntrue TF", y="Methods", x="Datasets") + theme_minimal()
+#   if(squeeze) p <- p + 
+#       theme(legend.position="bottom", legend.key.width = unit(1,"cm"),
+#             axis.text.x=element_text(angle=45, hjust=1, vjust=1))
+#   p
+# }
 
 rankHeatmap2 <- function(res, rankBreaks=c(1,5,25,75,150,300,600), ..., 
                          column_title="Datasets", doDraw=TRUE,
@@ -18,8 +18,8 @@ rankHeatmap2 <- function(res, rankBreaks=c(1,5,25,75,150,300,600), ...,
   rankm <- reshape2::dcast(res, method~dataset, value.var="rank")
   row.names(rankm) <- rankm[,1]
   rankm <- sqrt(as.matrix(rankm[,-1]))
-  ro <- row.names(rankm)[order(rowMeans(rankm))]
-  column_order <- names(sort(-colMeans(rankm)))
+  ro <- row.names(rankm)[order(rowMeans(rankm, na.rm=TRUE))]
+  column_order <- names(sort(-colMeans(rankm, na.rm=TRUE)))
   LFCbased <- grepl("GSEA|ulm|msViper|decoupleR|MonaLisa|diffTF|-lm",
                     row.names(rankm),ignore.case=TRUE)
   ancols <- list(type=c(deletion="darkorange3", dTag="black", ligand="darkslateblue"),
@@ -48,7 +48,8 @@ sensFDRplot <- function(res){
                              res$method, ignore.case=TRUE), "LFC-based", "sample-wise")
   }
   cols <- setNames(c("#CC6677", "#4477AA"), unique(res$type))
-  res2 <- aggregate(res[,c("Sensitivity", "FDR")], by=res[,c("method","type")], mean)
+  res2 <- aggregate(res[,c("Sensitivity", "FDR")], by=res[,c("method","type")],
+                    na.rm=TRUE, FUN=mean)
   ggplot(res2, aes(FDR, Sensitivity, label=method, colour=type)) + geom_point(show.legend=FALSE) + 
     theme_bw() + ggrepel::geom_text_repel(min.segment.length=0, show.legend=FALSE) +
     scale_color_manual(values=cols) +
@@ -75,8 +76,8 @@ relAUCplot2 <- function(res, doDraw=TRUE, sqrt=FALSE, column_title="Datasets",
   m <- reshape2::dcast(res, method~dataset, value.var="relAUC")
   row.names(m) <- m[,1]
   m <- as.matrix(m[,-1])
-  if(is.null(column_order)) column_order <- names(sort(colMeans(m)))
-  if(is.null(row_order)) row_order <- row.names(m)[order(-rowMeans(m))]
+  if(is.null(column_order)) column_order <- names(sort(colMeans(m, na.rm=TRUE)))
+  if(is.null(row_order)) row_order <- row.names(m)[order(-rowMeans(m, na.rm=TRUE))]
 
   ancols <- list(type=c(deletion="darkorange3", dTag="black", ligand="darkslateblue"),
                  LFCbased=c("FALSE"="white", "TRUE"="brown4"))
@@ -86,6 +87,7 @@ relAUCplot2 <- function(res, doDraw=TRUE, sqrt=FALSE, column_title="Datasets",
       m, cluster_rows=FALSE, cluster_columns=FALSE, ..., column_order=column_order,
       cell_fun=function(j, i, x, y, width, height, fill) {
         v <- gsub("^0","",round(m[i,j],2))
+        if(is.na(v)) v <- "."
         if(v=="") v <- "0"
         grid.text(v, x, y, gp=gpar(fontsize=8,
                                    col=ifelse(m[i,j]<0.5,"lightgrey","black")))
@@ -96,12 +98,12 @@ relAUCplot2 <- function(res, doDraw=TRUE, sqrt=FALSE, column_title="Datasets",
   draw(h, merge=TRUE)
 }
 
-runtimePlot <- function(res){
-  res <- res[!is.na(res$elapsed),]
-  res$runtime <- pmax(res$elapsed, res$cpu)
+runtimePlot <- function(res, removeNAs=FALSE){
+  if(removeNAs) res <- res[!is.na(res$elapsed) & !is.na(res$cpu),]
+  res$runtime <- pmax(res$elapsed, res$cpu, na.rm=TRUE)
   ggplot(res, aes(runtime/60, reorder(method,runtime))) + stat_summary() +
     #geom_boxplot(fill="lightgrey", outlier.size=1) + 
-    coord_trans(x="sqrt") + theme_bw() + labs(x="CPU time (min)",y="")
+    theme_bw() + labs(x="CPU time (min)",y="")
 }
 
 plotAllMetrics <- function(res){
@@ -162,7 +164,7 @@ getTopMethods <- function(){
 
 getMainMethods <- function(){
   c(`chromVAR::differentialDeviations` = "chromVAR", 
-    `chromVAR(z)>Qt>limma` = "chromVAR-adjusted",
+    `chromVAR(z)>Qt>limma` = "chromVAR-adjusted", diffTF="diffTF",
     monaLisa.vsOthers = "monaLisa", monaLisa.StabSel = "monaLisa.StabSel", 
     `msVIPER(scores)` = "msVIPER", `VIPER(binary)>limma` = "VIPER", 
     `decoupleR:consensus` = "decoupleR", fGSEA = "fGSEA",

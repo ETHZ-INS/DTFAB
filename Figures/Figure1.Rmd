@@ -16,6 +16,13 @@ source("../Scripts/runMethods.R")
 res <- readRDS("../fullFrags/results.rds")
 res <- res[res$method!="dev",]
 res <- renameMethods(res)
+# time was recorded only for the main chromVAR variants, so use that for all
+cvtime <- colMeans(as.matrix(
+  reshape2::dcast(res[grep("chromVAR",res$method),], formula=method~dataset,
+                  value.var="cpu")[,-1]), na.rm=TRUE)
+for(f in names(cvtime)){
+  res$cpu[which(grepl("chromVAR",res$method) & is.na(res$cpu) & res$dataset==f)] <- cvtime[[f]]
+}
 ```
 
 ```{r, fig.width=9, fig.height=9.5}
@@ -25,9 +32,11 @@ h2 <- suppressWarnings(relAUCplot2(res, row_order=names(row_order(h1)), doDraw=F
 h <- grid.grabExpr(draw(h1 + h2, merge=TRUE))
 res2 <- filterMethods(res, rename=FALSE)
 res2$method <- gsub(":","",res2$method)
+res2[res2$method=="diffTF","elapsed"] <- Inf
+rtplot <- runtimePlot(res2) + annotate("text", x=1230, y="diffTF", label=">>days") + coord_trans(x="sqrt", xlim=c(0,1400))
 fig <- cowplot::plot_grid(
   h,
-  plot_grid(sensFDRplot(res2), runtimePlot(res2), labels=LETTERS[2:3], nrow=1, scale=0.95),
+  plot_grid(sensFDRplot(res2), rtplot, labels=LETTERS[2:3], nrow=1, scale=0.95),
   nrow=2, labels=c("A",NA), scale=c(0.95,1), rel_heights = c(6.5,3)
 )
 fig

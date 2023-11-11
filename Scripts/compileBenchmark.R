@@ -91,3 +91,17 @@ getAllInteractors <- function(datasets, extra=c("CEBPB", "MAZ", "ZNF143", "NR3C1
   })
   return(ints)
 }
+
+
+
+transferDiffTFres <- function(infolder=".", outfolder){
+  lf <- list.files(infolder, pattern="\\.summary\\.tsv\\.gz", full=TRUE, recursive=TRUE)
+  names(lf) <- basename(dirname(dirname(lf)))
+  for(x in names(lf)){
+    a <- read.delim(lf[[x]])
+    b <- data.frame(row.names=a$TF, wmdiff=a$weighted_meanDifference, p=a$pvalue, padj=a$pvalueAdj)
+    b <- b[order(b$p, -abs(b$wmdiff)),]
+    b$rank <- seq_len(nrow(b))
+    saveRDS(b, paste0(outfolder,"/",x,"/runATAC_results/with_pvalues/diffTF.rds"))
+  }
+}
