@@ -110,6 +110,7 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
     library(monaLisa)
     library(fgsea)
     library(stringr)
+    devtools::install_github("Jiayi-Wang-Joey/chromVAR")
     library(chromVAR)
     library(motifmatchr)
     library(BiocParallel)
@@ -342,6 +343,8 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
     counts_perturbed <- counts[, colnames(counts)[(npos+1):(npos+nneg)]]
     DAR <- dATestedgeR(counts_control, 
                        counts_perturbed)
+    
+    
     
     # Generate required matrix of logFCs
     
