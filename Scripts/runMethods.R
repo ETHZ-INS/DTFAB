@@ -88,12 +88,15 @@ runAllMt <- function(datasets=getDatasets(), nthreads=3, ...){
 #' @param peakWidth The peak width to enforce (default 300, use 150 for NF peaks)
 #' @param forceRerun Whether to regenerate peak counts and motif instances
 #' @param outSubfolder Subfolder in which to save the results.
+#' @param readlist Vector of paths to aligned files, otherwise will be detected 
+#'   from folder.
 #' 
 #' @return A list of dataframes for each method (also saves them to disk)
 runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
                        methods=getMethods(), rndSeed=1997, peakWidth=300, 
                        decoupleR_modes=c("mlm", "ulm", "udt", "wsum"),
-                       forceRerun=FALSE, outSubfolder="runATAC_results"){
+                       forceRerun=FALSE, outSubfolder="runATAC_results",
+                       readlist=NULL){
   
   methods <- match.arg(methods, several.ok = TRUE)
   
@@ -185,8 +188,9 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
                     seqStyle=seqStyle, srcFolder=scriptsFolder)
     saveRDS(pmoi, pmoiPath)
   }
-  readlist <- list.files(mypath("seq_files"), 
-                         pattern=paste0(dataset$readType,"$"), full=TRUE)
+  if(is.null(readlist))
+    readlist <- list.files(mypath("seq_files"), 
+                           pattern=paste0(dataset$readType,"$"), full=TRUE)
   if(is.null(dataset$design))
     dataset$design <-
     c(rep(-1, length(readlist)/2), rep(1, length(readlist)/2))
