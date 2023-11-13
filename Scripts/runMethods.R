@@ -90,13 +90,14 @@ runAllMt <- function(datasets=getDatasets(), nthreads=3, ...){
 #' @param outSubfolder Subfolder in which to save the results.
 #' @param readlist Vector of paths to aligned files, otherwise will be detected 
 #'   from folder.
+#' @param DA.norm Normalization method to use for peak differential accessibility
 #' 
 #' @return A list of dataframes for each method (also saves them to disk)
 runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
                        methods=getMethods(), rndSeed=1997, peakWidth=300, 
                        decoupleR_modes=c("mlm", "ulm", "udt", "wsum"),
                        forceRerun=FALSE, outSubfolder="runATAC_results",
-                       readlist=NULL){
+                       readlist=NULL, DA.norm="TMM"){
   
   methods <- match.arg(methods, several.ok = TRUE)
   
@@ -110,7 +111,8 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
     library(monaLisa)
     library(fgsea)
     library(stringr)
-    devtools::install_github("Jiayi-Wang-Joey/chromVAR")
+    # for variations to the chromVAR normalization, install:
+    # devtools::install_github("Jiayi-Wang-Joey/chromVAR")
     library(chromVAR)
     library(motifmatchr)
     library(BiocParallel)
@@ -147,7 +149,8 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
   peaks <- keepStandardChromosomes(peaks, pruning.mode="coarse")
   
   # Paths to the method wrappers:
-  for(f in c(list.files(scriptsFolder, pattern="run.+R"), "getpmoi.R")){
+  for(f in c(list.files(scriptsFolder, pattern="run.+R"), "getpmoi.R",
+             "differentialAccessibility.R", "QCnorm.R")){
     source(file.path(scriptsFolder, f))
   }
   
@@ -342,7 +345,7 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
     counts_control <- counts[, colnames(counts)[1:npos]]
     counts_perturbed <- counts[, colnames(counts)[(npos+1):(npos+nneg)]]
     DAR <- dATestedgeR(counts_control, 
-                       counts_perturbed)
+                       counts_perturbed, norm.method=DA.norm)
     
     
     
