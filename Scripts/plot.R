@@ -1,16 +1,16 @@
-# rankHeatmap <- function(res, rankBreaks=c(1,6,20,50,100,200,400), squeeze=FALSE){
-#   p <- ggplot(res, aes(reorder(dataset,-sqrt(rank)), reorder(method,-sqrt(rank)),
-#                   fill=sqrt(rank), label=rank)) + geom_tile() +  geom_text() +
-#     scale_fill_viridis_c(direction=-1, breaks=sqrt(rankBreaks), 
-#                          trans="sqrt", labels=c("top",rankBreaks[-1])) +
-#     labs(fill="Rank of\ntrue TF", y="Methods", x="Datasets") + theme_minimal()
-#   if(squeeze) p <- p + 
-#       theme(legend.position="bottom", legend.key.width = unit(1,"cm"),
-#             axis.text.x=element_text(angle=45, hjust=1, vjust=1))
-#   p
-# }
+rankHeatmap <- function(res, rankBreaks=c(1,6,20,50,100,200,400), squeeze=FALSE){
+  p <- ggplot(res, aes(reorder(dataset,-sqrt(rank)), reorder(method,-sqrt(rank)),
+                  fill=sqrt(rank), label=rank)) + geom_tile() +  geom_text() +
+    scale_fill_viridis_c(direction=-1, breaks=sqrt(rankBreaks),
+                         trans="sqrt", labels=c("top",rankBreaks[-1])) +
+    labs(fill="Rank of\ntrue TF", y="Methods", x="Datasets") + theme_minimal()
+  if(squeeze) p <- p +
+      theme(legend.position="bottom", legend.key.width = unit(1,"cm"),
+            axis.text.x=element_text(angle=45, hjust=1, vjust=1))
+  p
+}
 
-rankHeatmap2 <- function(res, rankBreaks=c(1,5,25,75,150,300,600), ..., 
+rankHeatmap2 <- function(res, rankBreaks=c(1,10,30,75,150,300,600), ..., 
                          column_title="Datasets", doDraw=TRUE,
                          datasetInfo=data.frame(
                           type=sapply(getDatasets(), FUN=function(x) x$type))){
@@ -18,7 +18,12 @@ rankHeatmap2 <- function(res, rankBreaks=c(1,5,25,75,150,300,600), ...,
   rankm <- reshape2::dcast(res, method~dataset, value.var="rank")
   row.names(rankm) <- rankm[,1]
   rankm <- sqrt(as.matrix(rankm[,-1]))
-  ro <- row.names(rankm)[order(rowMeans(rankm, na.rm=TRUE))]
+  imput <- pmin(colMeans(rankm,na.rm=TRUE),
+                matrixStats::colMedians(rankm,na.rm=TRUE))
+  rankmImputed <- rankm
+  for(i in seq_len(ncol(rankm)))
+    rankmImputed[which(is.na(rankm[,i])),i] <- imput[i]
+  ro <- row.names(rankm)[order(rowMeans(rankmImputed, na.rm=TRUE))]
   column_order <- names(sort(-colMeans(rankm, na.rm=TRUE)))
   LFCbased <- grepl("GSEA|ulm|msViper|decoupleR|MonaLisa|diffTF|-lm",
                     row.names(rankm),ignore.case=TRUE)
@@ -26,21 +31,26 @@ rankHeatmap2 <- function(res, rankBreaks=c(1,5,25,75,150,300,600), ...,
                  LFCbased=c("FALSE"="white", "TRUE"="brown4"))
   colan <- HeatmapAnnotation(df = datasetInfo[colnames(rankm),,drop=FALSE],
                              col=ancols, show_annotation_name=FALSE)
+  bdist <- log10(rankBreaks[-1]-rankBreaks[-length(rankBreaks)])
   h <- ComplexHeatmap::Heatmap(rankm, cluster_rows=FALSE, cluster_columns=FALSE,
           cell_fun=function(j, i, x, y, width, height, fill) {
-            grid.text(sprintf("%1.0f", rankm[i, j]^2), x, y, gp = gpar(fontsize=8))
-                      },
+            grid.text(sprintf("%1.0f", rankm[i, j]^2), x, y,
+                      gp = gpar(fontsize=ifelse(is.na(rankm[i, j]),6,8)))
+          },
      col=viridisLite::viridis(100, direction=-1), name="Rank of\ntrue TF",
      column_title=column_title, row_order=ro, column_order=column_order, ..., 
      left_annotation=rowAnnotation(df=as.data.frame(LFCbased), col=ancols, show_legend=FALSE),
      row_names_side="left", top_annotation=colan,
-     heatmap_legend_param=list(at=sqrt(rankBreaks), labels=c("top",rankBreaks[-1])))
+     heatmap_legend_param=list(at=rev(sqrt(rankBreaks)),
+                               labels=rev(c("top",rankBreaks[-1])),
+                               break_dist=rev(bdist), legend_height=unit(3.5, "cm"),
+                               labels_gp=gpar(fontsize=9)))
   if(!doDraw) return(h)
   draw(h, merge=TRUE)
 }
 
 
-sensFDRplot <- function(res){
+sensFDRplot <- function(res, fade=NULL, PR=TRUE, hull=TRUE){
   res$Sensitivity <- res$trueQ<0.05
   res$FDR[which(is.na(res$FDR))] <- 0
   if(is.null(res$type)){
@@ -50,9 +60,28 @@ sensFDRplot <- function(res){
   cols <- setNames(c("#CC6677", "#4477AA"), unique(res$type))
   res2 <- aggregate(res[,c("Sensitivity", "FDR")], by=res[,c("method","type")],
                     na.rm=TRUE, FUN=mean)
-  ggplot(res2, aes(FDR, Sensitivity, label=method, colour=type)) + geom_point(show.legend=FALSE) + 
-    theme_bw() + ggrepel::geom_text_repel(min.segment.length=0, show.legend=FALSE) +
-    scale_color_manual(values=cols) +
+  res2$precision <- 1-res2$FDR
+  res2$fade <- FALSE
+  if(!is.null(fade)) res2$fade <- grepl(fade, res2$method)
+  res3 <- res2[chull(res2$Sensitivity, res2$precision),]
+  res3 <- res3[which(res3$Sensitivity==max(res3$Sensitivity) | 
+                       res3$precision==max(res3$precision) |
+                       (res3$Sensitivity+res3$precision)>
+                         mean(res2$Sensitivity+res2$precision)),]
+  if(PR){
+    p <- ggplot(res2, aes(Sensitivity, precision, label=method, colour=type, alpha=fade)) +
+      labs(x="Recall (i.e. sensitivity)\n(Proportion of datasets in which the true motif is significant)",
+           y="Precision (i.e. 1-FDR)\n(Proportion of network motifs among significant)")
+  }else{
+    p <- ggplot(res2, aes(FDR, Sensitivity, label=method, colour=type, alpha=fade))
+  }
+  if(hull) p <- p + geom_line(data=res3, colour="lightgrey", linetype="dashed", alpha=1)
+  p +
+    geom_point(show.legend=FALSE) +  theme_bw() + 
+    scale_x_continuous(breaks=scales::pretty_breaks()) + 
+    scale_y_continuous(breaks=scales::pretty_breaks()) + 
+    ggrepel::geom_text_repel(min.segment.length=0, show.legend=FALSE) +
+    scale_color_manual(values=cols) + scale_alpha_manual(values=c("TRUE"=0.5, "FALSE"=1)) +
     theme(legend.position = "bottom")
 }
 
@@ -69,13 +98,30 @@ relAUCplot <- function(res, squeeze=FALSE){
   p
 }
 
-relAUCplot2 <- function(res, doDraw=TRUE, sqrt=FALSE, column_title="Datasets", 
+relAUCplot2 <- function(res, doDraw=TRUE, column_title="Datasets", 
                         column_order=NULL, row_order=NULL, ..., 
+                        type=c("propOfMax","MAD","relAUC"),
                         datasetInfo=data.frame(
                            type=sapply(getDatasets(), FUN=function(x) x$type))){
-  m <- reshape2::dcast(res, method~dataset, value.var="relAUC")
-  row.names(m) <- m[,1]
+  type <- match.arg(type)
+  m1 <- reshape2::dcast(res, method~dataset, value.var="relAUC")
+  if(type=="propOfMax"){
+    dmax <- aggregate(res$AUC, by=list(ds=res$dataset), na.rm=TRUE, FUN=max)
+    dmax <- setNames(dmax$x, dmax$ds)
+    res$AUCprop <- res$AUC/dmax[as.character(res$dataset)]
+    m <- reshape2::dcast(res, method~dataset, value.var="AUCprop")
+  }else if(type=="MAD"){
+    dmed <- aggregate(res$relAUC, by=list(ds=res$dataset), na.rm=TRUE, FUN=median)
+    dmed <- setNames(dmed$x, dmed$ds)
+    res$AUCdiff <- res$relAUC-dmed[as.character(res$dataset)]
+    res$AUCdiff <- res$AUCdiff/median(abs(res$AUCdiff),na.rm=TRUE)
+    m <- reshape2::dcast(res, method~dataset, value.var="AUCdiff")
+  }else{
+    m <- m1
+  }
+  row.names(m1) <- row.names(m) <- m[,1]
   m <- as.matrix(m[,-1])
+  m1 <- as.matrix(m1[,-1])
   if(is.null(column_order)) column_order <- names(sort(colMeans(m, na.rm=TRUE)))
   if(is.null(row_order)) row_order <- row.names(m)[order(-rowMeans(m, na.rm=TRUE))]
 
@@ -86,24 +132,44 @@ relAUCplot2 <- function(res, doDraw=TRUE, sqrt=FALSE, column_title="Datasets",
   h <- ComplexHeatmap::Heatmap(
       m, cluster_rows=FALSE, cluster_columns=FALSE, ..., column_order=column_order,
       cell_fun=function(j, i, x, y, width, height, fill) {
-        v <- gsub("^0","",round(m[i,j],2))
+        v <- gsub("^0","",round(m1[i,j],2))
         if(is.na(v)) v <- "."
         if(v=="") v <- "0"
         grid.text(v, x, y, gp=gpar(fontsize=8,
                                    col=ifelse(m[i,j]<0.5,"lightgrey","black")))
       },
-      col=viridisLite::magma(100), name="Relative\nnetwork AUC",
+      col=viridisLite::magma(100),
+      name=ifelse(type=="relAUC","Relative\nnetwork AUC","Relative\nnetwork\nscore"),
       column_title=column_title, row_names_side="left", top_annotation=colan)
   if(!doDraw) return(h)
   draw(h, merge=TRUE)
 }
 
-runtimePlot <- function(res, removeNAs=FALSE){
+runtimePlot <- function(res, removeNAs=FALSE, cpu=TRUE){
   if(removeNAs) res <- res[!is.na(res$elapsed) & !is.na(res$cpu),]
-  res$runtime <- pmax(res$elapsed, res$cpu, na.rm=TRUE)
+  if(cpu){
+    res$runtime <- pmax(res$elapsed, res$cpu, na.rm=TRUE)
+  }else{
+    res$runtime <- res$elapsed
+  }
   ggplot(res, aes(runtime/60, reorder(method,runtime))) + stat_summary() +
     #geom_boxplot(fill="lightgrey", outlier.size=1) + 
-    theme_bw() + labs(x="CPU time (min)",y="")
+    theme_bw() + labs(x=ifelse(cpu,"CPU time (min)","Total elapsed time (min)"),y="")
+}
+
+runtimePlot2 <- function(res, removeNAs=FALSE, removeCPU="Lasso|decoupleR|VIPER"){
+  if(removeNAs) res <- res[!is.na(res$elapsed) & !is.na(res$cpu),]
+  if(!is.null(removeCPU)){
+    w <- which(grepl(removeCPU,res$method))
+    res$elapsed[w] <- pmax(res$elapsed[w], res$cpu[w], na.rm=TRUE)
+    res$cpu[w] <- NA
+  }
+  res3 <- reshape2::melt(res, id.vars=c("method","dataset"),
+                         measure.vars=c("elapsed","cpu"))
+  ggplot(res3, aes(value/60, reorder(method,value,na.rm=TRUE), colour=variable)) + 
+    stat_summary(position=position_dodge(width=0.25)) +
+    theme_bw() + labs(x="Time per dataset (min)", y="")
+  
 }
 
 plotAllMetrics <- function(res){
@@ -163,7 +229,7 @@ getTopMethods <- function(){
 }
 
 getMainMethods <- function(){
-  c(`chromVAR::differentialDeviations` = "chromVAR", 
+  c(`chromVAR:differentialDeviations` = "chromVAR", 
     `chromVAR(z)>Qt>limma` = "chromVAR-adjusted", diffTF="diffTF",
     monaLisa.vsOthers = "monaLisa", monaLisa.StabSel = "monaLisa.StabSel", 
     `msVIPER(scores)` = "msVIPER", `VIPER(binary)>limma` = "VIPER", 
@@ -171,3 +237,4 @@ getMainMethods <- function(){
     insertionModel="insertionModel", ulmB="ulm","Lasso-lm"="Lasso",
     "BaGFootLike"="BaGFootLike")
 }
+

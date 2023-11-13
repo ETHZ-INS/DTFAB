@@ -379,7 +379,8 @@ p1 <- ggplot(bml2, aes(reorder(method,-sqrt(rank)), reorder(dataset, -sqrt(rank)
                        trans="sqrt", labels=c("top",rankBreaks[-1])) +
   labs(x="", y="", fill="rank of \ntrue motif   ")
 
-plot_grid(p1, sensFDRplot(bml2) + coord_cartesian(ylim=c(0,0.65), xlim=c(0,1), expand=FALSE),
+plot_grid(p1, sensFDRplot(bml2, hull=FALSE) + 
+            coord_cartesian(ylim=c(0,0.65), xlim=c(0,1), expand=FALSE),
           nrow=2, labels="AUTO", scale=0.95)
 ```
 
