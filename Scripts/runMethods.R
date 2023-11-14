@@ -150,7 +150,7 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
   
   # Paths to the method wrappers:
   for(f in c(list.files(scriptsFolder, pattern="run.+R"), "getpmoi.R",
-             "differentialAccessibility.R", "QCnorm.R")){
+             "differentialAccessibility.R", "GCnorm.R")){
     source(file.path(scriptsFolder, f))
   }
   

@@ -56,7 +56,6 @@ GCQuantileNorm <- function(se, genome=NULL, g=20,
                            summary='median', round=TRUE) {
     
     stopifnot(!is.null(genome) || !is.null(rowData(se)$bias))
-    
     # get GC content
     gr <- rowRanges(se)
     if(!is.null(rowData(se)$bias)){
@@ -73,7 +72,7 @@ GCQuantileNorm <- function(se, genome=NULL, g=20,
 
 
 GCSmoothQuantile <- function(se, genome=NULL, g=20, bio) {
-    
+    library(qsmooth)
     # get GC content
     gr <- rowRanges(se)
     se <- as(se,"SummarizedExperiment")
