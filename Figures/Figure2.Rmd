@@ -23,26 +23,44 @@ res <- renameMethods(res)
 ```{r}
 aTheme <- theme_bw() + theme(legend.position ="none", title=element_text(size=10), plot.title=element_text(size=10.5))
 
+diff2Type <- function(x){
+  factor(sign(x), c("-1","0","1"), c("worsened","same","improved"))
+}
+
+
 CVlimma <- res[which(res$method %in% c("chromVAR(deviations)>limma","chromVAR:differentialDeviations")),]
 cv1 <- reshape2::dcast(CVlimma, formula = dataset~method, value.var = "rank")
-cv1$diffsign <- sign(cv1$`chromVAR:differentialDeviations`-cv1$`chromVAR(deviations)>limma`)
-p1 <- ggplot(cv1, aes(`chromVAR:differentialDeviations`, `chromVAR(deviations)>limma`, label=dataset, colour=factor(diffsign))) + 
+cv1$diffsign <- diff2Type(cv1$`chromVAR:differentialDeviations`-cv1$`chromVAR(deviations)>limma`)
+typecols <- setNames(c("red","black","darkblue"),levels(cv1$diffsign))
+
+p1 <- ggplot(ranks, aes(TMM, GCsmoothQuantile, label=dataset, colour=type)) +
+  geom_abline(slope=1, colour="grey", linetype="dashed") + geom_point() + 
+  ggrepel::geom_text_repel(min.segment.length=0, size=2.5, alpha=0.6) + 
+  scale_colour_manual(values=typecols) +
+  facet_wrap(~method) + scale_y_log10() + scale_x_log10() + theme_bw() +
+  theme(legend.position = "bottom") + 
+  labs(x="Rank of true motif, using standard (TMM) normalization",
+       y="Rank of true motif, using smooth quantile normalization",
+       colour="Change in using smooth quantile normalization:") +
+  guides(colour=guide_legend(override.aes=list(size=3)))
+
+p1 <- ggplot(cv1, aes(`chromVAR:differentialDeviations`, `chromVAR(deviations)>limma`, label=dataset, colour=diffsign)) + 
         geom_abline(slope=1, colour="grey") + geom_point() + 
-        ggrepel::geom_text_repel(min.segment.length=0, size=3.5) + 
+        ggrepel::geom_text_repel(min.segment.length=0, size=3, alpha=0.7) + 
         scale_x_log10() + scale_y_log10() + aTheme +
-        scale_colour_manual(values=c("-1"="red", "0"="black", "1"="darkblue")) +
+        scale_colour_manual(values=typecols) +
         labs(x="Rank of true motif in chromVAR::differentialDeviations",
              y="Rank of true motif in\nchromVAR(deviations)>limma") +
         ggtitle("chromVAR>limma outperforms native\nchromVAR differential analysis")
 
 CVlimma <- res[which(res$method %in% c("chromVAR(deviations)>limma","chromVAR(z)>Qt>limma")),]
 cv1 <- reshape2::dcast(CVlimma, formula = dataset~method, value.var = "rank")
-cv1$diffsign <- sign(cv1$`chromVAR(deviations)>limma`-cv1$`chromVAR(z)>Qt>limma`)
-p2 <- ggplot(cv1, aes(`chromVAR(deviations)>limma`, `chromVAR(z)>Qt>limma`, label=dataset, colour=factor(diffsign))) + 
+cv1$diffsign <- diff2Type(cv1$`chromVAR(deviations)>limma`-cv1$`chromVAR(z)>Qt>limma`)
+p2 <- ggplot(cv1, aes(`chromVAR(deviations)>limma`, `chromVAR(z)>Qt>limma`, label=dataset, colour=diffsign)) + 
         geom_abline(slope=1, colour="grey") + geom_point() + 
-        ggrepel::geom_text_repel(min.segment.length=0, size=3.5) + 
+        ggrepel::geom_text_repel(min.segment.length=0, size=3, alpha=0.7) + 
         scale_x_log10() + scale_y_log10() + aTheme +
-        scale_colour_manual(values=c("-1"="red", "0"="black", "1"="darkblue")) +
+        scale_colour_manual(values=typecols) +
         labs(x="Rank of true motif in chromVAR(deviations)>limma",
              y="Rank of true motif in\nchromVAR(z)>Qt>limma") +
         ggtitle("Differential analysis on normalized z-scores\nis preferable to using the adjusted deviations")
@@ -56,35 +74,38 @@ resNF <- renameMethods(resNF)
 m <- merge(resFoN, resNF, by=c("dataset", "method"), suffix=c(".FoNF",".NF"))
 m <- merge(res, m, by=c("dataset","method"))
 m <- m[m$method %in% c("chromVAR(z)>limma","monaLisa.vsOthers"),]
-p3 <- plot_grid(
-ggplot(m, aes(rank, rank.FoNF, label=dataset, colour=factor(-sign(rank.FoNF-rank)))) + 
+m$diffsign <- diff2Type(-sign(m$rank.FoNF-m$rank))
+p3 <- ggplot(m, aes(rank, rank.FoNF, label=dataset, colour=diffsign)) + 
     geom_abline(slope=1, colour="grey") + geom_point() + 
-    ggrepel::geom_text_repel(min.segment.length=0, size=3.5) + facet_wrap(~method) +
-    scale_x_log10() + scale_y_log10() + aTheme + 
-    scale_colour_manual(values=c("-1"="red", "0"="black", "1"="darkblue")) +
-    labs(x="Rank of true motif (using all fragments)", y="Rank of true motif\n(all fragments on nuc-free peaks)",
-         title="Using nucleosome-free fragments does not generally improve results"),
-  ggplot(m, aes(rank, rank.NF, label=dataset, colour=factor(-sign(rank.NF-rank)))) + 
+    ggrepel::geom_text_repel(min.segment.length=0, size=3, alpha=0.7, show.legend=FALSE) + 
+  facet_wrap(~method) + scale_x_log10() + scale_y_log10() + aTheme + 
+    scale_colour_manual(values=typecols) +
+    labs(x="Rank of true motif (using all fragments)",
+         y="Rank of true motif\n(all fragments on nuc-free peaks)",
+         colour="Change (in y relative to x):",
+         title="Specifically using nucleosome-free fragments does not generally improve results")
+p4 <- ggplot(m, aes(rank, rank.NF, label=dataset, colour=diffsign)) + 
     geom_abline(slope=1, colour="grey") + geom_point() + 
-    ggrepel::geom_text_repel(min.segment.length=0, size=3.5) + facet_wrap(~method) +
-    scale_x_log10() + scale_y_log10() + aTheme +
-    scale_colour_manual(values=c("-1"="red", "0"="black", "1"="darkblue")) +
-    labs(x="Rank of true motif (using all fragments)", y="Rank of true motif\n(only nuc-free fragments)"),
-  nrow=2, labels=LETTERS[3:4], scale=0.95, rel_heights=c(1.1,1)
-)
+    ggrepel::geom_text_repel(min.segment.length=0, size=3, alpha=0.7) + 
+  facet_wrap(~method) + scale_x_log10() + scale_y_log10() + aTheme +
+    scale_colour_manual(values=typecols) +
+    labs(x="Rank of true motif (using all fragments)", y="Rank of true motif\n(only nuc-free fragments)")
 ```
 
 
-```{r, fig.width=8, fig.height=8.5}
+```{r, fig.width=7.8, fig.height=8.5}
 fig <- plot_grid(
   plot_grid(p1,p2, nrow=1, scale=0.95, labels="AUTO"),
-  p3, rel_heights=c(1,2), nrow=2
+  get_legend(p3 + theme(legend.position = "bottom") + 
+               guides(colour=guide_legend(override.aes=list(size=3)))),
+  p3, p4, nrow=4, scale=c(1,1,0.95,0.95), labels=c(NA,NA,"C","D"),
+  rel_heights=c(1.1,0.2,1.1,1)
 )
 fig
 ```
 
 ```{r}
-pdf("Figure2.pdf", width=8, height=8.5)
+pdf("Figure2.pdf", width=7.8, height=8.5)
 fig
 dev.off()
 ```

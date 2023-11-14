@@ -1,0 +1,77 @@
+---
+title: "Figure 3"
+author: "Pierre-Luc Germain"
+date: "11/14/2023"
+output: html_document
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(ggplot2)
+  library(cowplot)
+  library(ComplexHeatmap)
+})
+source("../Scripts/plot.R")
+source("../Scripts/runMethods.R")
+```
+
+```{r}
+res1 <- readRDS("../fullFrags/results.rds")
+res2 <- readRDS("../GCnorm/results.rds")
+res2 <- res2[!grepl("^VIPER",res2$method),]
+res1$norm <- "TMM"
+res2$norm <- "GCsmoothQuantile"
+res <- rbind(res1[which(res1$method %in% res2$method),],res2)
+meths <- c("monaLisa.StabSel", "monaLisa.vsOthers", "monaLisa.vsZero", "ulm(binary)", "Lasso-lm", "msVIPER(scores)", "decoupleR:consensus")
+res <- res[res$method %in% meths,]
+```
+
+
+```{r}
+ranks <- reshape2:::dcast(res, formula=dataset+method~norm, value.var="rank")
+ranks$type <- factor(sign(ranks$TMM-ranks$GCsmoothQuantile), c("-1","0","1"),
+                     c("worsened","same","improved"))
+typecols <- setNames(c("red","black","darkblue"),levels(ranks$type))
+p1 <- ggplot(ranks, aes(TMM, GCsmoothQuantile, label=dataset, colour=type)) +
+  geom_abline(slope=1, colour="grey", linetype="dashed") + geom_point() + 
+  ggrepel::geom_text_repel(min.segment.length=0, size=2.5, alpha=0.6) + 
+  scale_colour_manual(values=typecols) +
+  facet_wrap(~method) + scale_y_log10() + scale_x_log10() + theme_bw() +
+  theme(legend.position = "bottom") + 
+  labs(x="Rank of true motif, using standard (TMM) normalization",
+       y="Rank of true motif, using smooth quantile normalization",
+       colour="Change in using smooth quantile normalization:") +
+  guides(colour=guide_legend(override.aes=list(size=3)))
+```
+
+```{r}
+res3 <- rbind(res1[res1$method %in% c("chromVAR(z)>Qt>limma"),],
+              res2[res2$method %in% res$method,])
+rowann <- rowAnnotation(df=data.frame(row.names=unique(res3$method),
+                                      GCsmoothQ=unique(res3$method) %in% res2$method),
+                        col=list(GCsmoothQ=c("FALSE"="white", "TRUE"="brown4")),
+                        show_legend=FALSE, annotation_name_gp=gpar(fontsize=10))
+p2 <- grid.grabExpr(rankHeatmap2(res3, rowann=rowann, column_title="",
+                                 row_names_gp=gpar(fontsize=9),
+                                 column_names_gp=gpar(fontsize=10)))
+p3 <- sensFDRplot(res3, longTitles=FALSE, hull=FALSE) +
+  ggtitle("at nominal p.adjust <= 0.5") +
+  theme(plot.title=element_text(size=11), 
+        axis.title=element_text(size=10))
+```
+
+```{r, fig.width=8.5, fig.height=9}
+fig <- plot_grid(
+  p1,
+  plot_grid(p2,p3,nrow=1,labels=LETTERS[2:3], scale=c(1,0.95), rel_widths=c(4,3)),
+  nrow=2, rel_heights=c(1.5,1), labels=c("A",NA), scale=c(0.95,1)
+)
+fig
+```
+
+
+```{r}
+pdf("Figure3.pdf", width=8.5, height=9)
+fig
+dev.off()
+```

@@ -28,9 +28,13 @@ rtplot <- runtimePlot2(res2) + annotate("text", x=1200, y="diffTF", label=">>day
   scale_x_continuous(breaks=c(5,60,180,360,600,1200),
                      minor_breaks=c(1,30,120,270,480,900,1500)) +
   coord_trans(x="sqrt", xlim=c(1,1400)) + theme(legend.position=c(0.75,0.2))
+pr <- sensFDRplot(res2) + 
+  ggtitle("Top variant per method, at nominal p.adjust <= 0.5") +
+  theme(plot.title=element_text(size=11),
+        axis.title=element_text(size=10))
 fig <- cowplot::plot_grid(
   h,
-  plot_grid(sensFDRplot(res2) + ggtitle("At nominal p.adjust <= 0.5"), rtplot, labels=LETTERS[2:3], nrow=1, scale=0.95, rel_widths=c(4,3.5)),
+  plot_grid(pr, rtplot, labels=LETTERS[2:3], nrow=1, scale=0.95, rel_widths=c(4,3.5)),
   nrow=2, labels=c("A",NA), scale=c(0.95,1), rel_heights = c(6,3)
 )
 fig

@@ -11,7 +11,7 @@ rankHeatmap <- function(res, rankBreaks=c(1,6,20,50,100,200,400), squeeze=FALSE)
 }
 
 rankHeatmap2 <- function(res, rankBreaks=c(1,10,30,75,150,300,600), ..., 
-                         column_title="Datasets", doDraw=TRUE,
+                         column_title="Datasets", doDraw=TRUE, rowann=NULL,
                          datasetInfo=data.frame(
                           type=sapply(getDatasets(), FUN=function(x) x$type))){
   library(ComplexHeatmap)
@@ -32,6 +32,8 @@ rankHeatmap2 <- function(res, rankBreaks=c(1,10,30,75,150,300,600), ...,
   colan <- HeatmapAnnotation(df = datasetInfo[colnames(rankm),,drop=FALSE],
                              col=ancols, show_annotation_name=FALSE)
   bdist <- log10(rankBreaks[-1]-rankBreaks[-length(rankBreaks)])
+  if(is.null(rowann))
+    rowann <- rowAnnotation(df=as.data.frame(LFCbased), col=ancols, show_legend=FALSE)
   h <- ComplexHeatmap::Heatmap(rankm, cluster_rows=FALSE, cluster_columns=FALSE,
           cell_fun=function(j, i, x, y, width, height, fill) {
             grid.text(sprintf("%1.0f", rankm[i, j]^2), x, y,
@@ -39,8 +41,7 @@ rankHeatmap2 <- function(res, rankBreaks=c(1,10,30,75,150,300,600), ...,
           },
      col=viridisLite::viridis(100, direction=-1), name="Rank of\ntrue TF",
      column_title=column_title, row_order=ro, column_order=column_order, ..., 
-     left_annotation=rowAnnotation(df=as.data.frame(LFCbased), col=ancols, show_legend=FALSE),
-     row_names_side="left", top_annotation=colan,
+     left_annotation=rowann, row_names_side="left", top_annotation=colan,
      heatmap_legend_param=list(at=rev(sqrt(rankBreaks)),
                                labels=rev(c("top",rankBreaks[-1])),
                                break_dist=rev(bdist), legend_height=unit(3.5, "cm"),
@@ -50,7 +51,7 @@ rankHeatmap2 <- function(res, rankBreaks=c(1,10,30,75,150,300,600), ...,
 }
 
 
-sensFDRplot <- function(res, fade=NULL, PR=TRUE, hull=TRUE){
+sensFDRplot <- function(res, fade=NULL, PR=TRUE, hull=TRUE, label.size=3.5, longTitles=TRUE){
   res$Sensitivity <- res$trueQ<0.05
   res$FDR[which(is.na(res$FDR))] <- 0
   if(is.null(res$type)){
@@ -69,9 +70,16 @@ sensFDRplot <- function(res, fade=NULL, PR=TRUE, hull=TRUE){
                        (res3$Sensitivity+res3$precision)>
                          mean(res2$Sensitivity+res2$precision)),]
   if(PR){
-    p <- ggplot(res2, aes(Sensitivity, precision, label=method, colour=type, alpha=fade)) +
+    p <- ggplot(res2, aes(Sensitivity, precision, label=method, colour=type, alpha=fade))
+    if(longTitles){
+      p <- p +
       labs(x="Recall (i.e. sensitivity)\n(Proportion of datasets in which the true motif is significant)",
            y="Precision (i.e. 1-FDR)\n(Proportion of network motifs among significant)")
+    }else{
+      p <- p +
+        labs(x="Recall (i.e. sensitivity)",
+             y="Precision (i.e. 1-FDR)")
+    }
   }else{
     p <- ggplot(res2, aes(FDR, Sensitivity, label=method, colour=type, alpha=fade))
   }
@@ -80,7 +88,7 @@ sensFDRplot <- function(res, fade=NULL, PR=TRUE, hull=TRUE){
     geom_point(show.legend=FALSE) +  theme_bw() + 
     scale_x_continuous(breaks=scales::pretty_breaks()) + 
     scale_y_continuous(breaks=scales::pretty_breaks()) + 
-    ggrepel::geom_text_repel(min.segment.length=0, show.legend=FALSE) +
+    ggrepel::geom_text_repel(min.segment.length=0, show.legend=FALSE, size=label.size) +
     scale_color_manual(values=cols) + scale_alpha_manual(values=c("TRUE"=0.5, "FALSE"=1)) +
     theme(legend.position = "bottom")
 }
@@ -168,7 +176,8 @@ runtimePlot2 <- function(res, removeNAs=FALSE, removeCPU="Lasso|decoupleR|VIPER"
                          measure.vars=c("elapsed","cpu"))
   ggplot(res3, aes(value/60, reorder(method,value,na.rm=TRUE), colour=variable)) + 
     stat_summary(position=position_dodge(width=0.25)) +
-    theme_bw() + labs(x="Time per dataset (min)", y="")
+    theme_bw() + labs(x="Time per dataset (min)", y="") +
+    theme(axis.text.y=element_text(color="black"))
   
 }
 
