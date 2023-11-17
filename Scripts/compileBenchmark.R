@@ -47,6 +47,12 @@ getBenchmarkMetrics <- function(dataset, path=head(dataset$truth,1),
     rt <- rbind(rt, data.frame(row.names=paste0("decoupleR",names(dt)),
                                elapsed=dt, cpu=dt))
   }
+  if(any(row.names(rt)=="decoupleRlimma")){
+    # grab times for individual methods
+    dt <- readRDS(file.path(path, resin, "raw","decoupleRlimma_raw.rds"))$runtime2
+    rt <- rbind(rt, data.frame(row.names=paste0("decoupleRlimma",names(dt)),
+                               elapsed=dt, cpu=dt))
+  }
   # get actual results
   fl <- list.files(file.path(path, resin, "with_pvalues"), full=TRUE)
   names(fl) <- gsub("\\.rds$","",basename(fl))
@@ -64,13 +70,20 @@ getBenchmarkMetrics <- function(dataset, path=head(dataset$truth,1),
   allTFs <- row.names(x)
   cofactors <- intersect(cofactors, allTFs)
   cappedNCof <- min(length(cofactors),100)
-  optimalAUC <- sum(cumsum(c(rep(1,cappedNCof), rep(0,100-cappedNCof)))/seq_len(100))
+  optimalAUC <- sum(cumsum(c(rep(1,cappedNCof),
+                             rep(0,100-cappedNCof)))/seq_len(100))
   w <- head(which(row.names(x) %in% truth),1)
+  if(length(w)==0){
+    w <- nrow(x)+1L
+    trueQ <- 1
+  }else{
+    trueQ <- x[w,"padj"]
+  }
   x$isCofactor <- row.names(x) %in% cofactors
   auc <- sum(cumsum(head(x$isCofactor,100))/seq_len(100))
   if(is.null(x$padj)) x$padj <- x$adj.P.Val
   xsig <- x[which(x$padj<0.05),,drop=FALSE]
-  data.frame(rank=w, trueQ=x[w,"padj"],
+  data.frame(rank=w, trueQ=trueQ,
              FDR=sum(!xsig$isCofactor)/nrow(xsig),
              AUC=auc, relAUC=auc/optimalAUC)
 }
@@ -96,7 +109,8 @@ getAllInteractors <- function(datasets, extra=c("CEBPB", "MAZ", "ZNF143", "NR3C1
 
 transferDiffTFres <- function(infolder=".", outfolder){
   lf <- list.files(infolder, pattern="\\.summary\\.tsv\\.gz", full=TRUE, recursive=TRUE)
-  names(lf) <- basename(dirname(dirname(lf)))
+  m <- sapply(strsplit(dirname(lf),"/"),FUN=identity)
+  names(lf) <- m[which.max(apply(m,1,FUN=function(x) length(unique(x)))),]
   for(x in names(lf)){
     a <- read.delim(lf[[x]])
     b <- data.frame(row.names=a$TF, wmdiff=a$weighted_meanDifference, p=a$pvalue, padj=a$pvalueAdj)
