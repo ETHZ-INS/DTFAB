@@ -1,13 +1,10 @@
-rundecoupleR <- function(counts,
-                         genome,
-                         motifs,
-                         DAR,
+rundecoupleR <- function(counts, genome, motifs, DAR,
+                         norm=c("TMM","GCSmoothQuantile"),
+                         mode=c("logFC", "sample"),
                          decoupleR_modes=c("mlm", "ulm", "norm_wsum")){
 
-  # Generate required matrix of logFCs
-  
-  DARmat <- as.matrix(DAR$logFC)
-  row.names(DARmat) <- rownames(DAR)
+  norm <- match.arg(norm)
+  mode <- match.arg(mode)
   
   # Generate required network
   
@@ -20,8 +17,10 @@ rundecoupleR <- function(counts,
     matchingMotifs <- matchMotifs(motifs, counts, genome)
     row.names(matchingMotifs) <- as.character(granges(matchingMotifs))
     matchingMtx <- as(assay(matchingMotifs), "TsparseMatrix")
-    network <- data.frame(source=factor(colnames(matchingMtx), colnames(matchingMtx))[matchingMtx@j+1L], 
-                          target=factor(row.names(matchingMtx), row.names(matchingMtx))[matchingMtx@i+1L])
+    network <- data.frame(source=factor(colnames(matchingMtx), 
+                                        colnames(matchingMtx))[matchingMtx@j+1L], 
+                          target=factor(row.names(matchingMtx), 
+                                        row.names(matchingMtx))[matchingMtx@i+1L])
   }
   network$mor <- 1L
   network$target <- sub(":\\+$", "", network$target)
@@ -30,28 +29,64 @@ rundecoupleR <- function(counts,
   network <- .removeColinearity(network)
   
   ptm <- proc.time()
+  if(mode=="sample"){
+    res <- .decoupleR.sample(counts, network, decoupleR_modes, norm=norm)
+  }else{
+    # Generate required matrix of logFCs
+    DARmat <- as.matrix(DAR$logFC)
+    row.names(DARmat) <- rownames(DAR)
+    res <- .decoupleR.logFC(DARmat, network, decoupleR_modes)
+  }
+  runtime2 <- sapply(split(res$raw$res$statistic_time,
+                           res$raw$res$statistic), unique)
+  runtime2["consensus"] <- sum(runtime2)
+  
+  res$raw$runtime <- proc.time()-ptm
+  res$raw$runtime2=runtime2
+  return(res)
+}
+
+.decoupleR.logFC <- function(DARmat, network, decoupleR_modes){
   if(is.null(colnames(DARmat))) colnames(DARmat) <- "A"
   dcplR <- decouple(DARmat, network, .source='source', .target='target',
                     minsize=5, include_time=TRUE, consensus_score=TRUE,
                     statistics=decoupleR_modes)
-  runtime <- proc.time()-ptm
-  runtime2 <- sapply(split(dcplR$statistic_time, dcplR$statistic), unique)
-  runtime2["consensus"] <- sum(runtime2)
-  
   dcplR <- dcplR[dcplR$condition=="A",]
   res <- lapply(split(as.data.frame(dcplR[,c("source","score","p_value")]),
-                      dcplR$statistic), FUN=function(x){
-    x <- x[order(x$p_value, abs(x$score)),]
-    colnames(x)[3] <- "p"
-    row.names(x) <- x$source
-    x$source <- NULL
-    x$rank <- seq_len(nrow(x))
-    x$padj <- p.adjust(x$p)
-    x
+                    dcplR$statistic), FUN=function(x){
+                      x <- x[order(x$p_value, abs(x$score)),]
+                      colnames(x)[3] <- "p"
+                      row.names(x) <- x$source
+                      x$source <- NULL
+                      x$rank <- seq_len(nrow(x))
+                      x$padj <- p.adjust(x$p)
+                      x
+                    })
+
+  return(list(raw=list(res=dcplR), res=res))
+}
+
+.decoupleR.sample <- function(se, network, decoupleR_modes, norm="TMM"){
+  se$group <- rep(LETTERS[1:2],each=ncol(se)/2)
+  if(norm=="TMM"){
+    y <- log1p(cpm(calcNormFactors(DGEList(assay(se)))))
+  }else{
+    y <- GCSmoothQuantile(se, bio="group")
+  }
+  dcplR <- decouple(y, network, .source='source', .target='target',
+                    minsize=5, include_time=TRUE, consensus_score=TRUE,
+                    statistics=decoupleR_modes)
+  res <- lapply(split(dcplR, dcplR$statistic), FUN=function(dc){
+    m <- reshape2::dcast(dc, source~condition, value.var="score")
+    row.names(m) <- m[,1]
+    m <- as.matrix(m[,-1])
+    m <- m[apply(m,1,FUN=sd)>0,]
+    fit <- eBayes(lmFit(m, model.matrix(~se$group)))
+    res <- topTable(fit, number=Inf)
+    data.frame(row.names=row.names(res), logFC=res$logFC, t=res$t,
+               p=res$P.Value, padj=res$adj.P.Val, rank=seq_len(nrow(res)))
   })
-  
-  return(list(raw=list(res=dcplR, runtime=runtime, runtime2=runtime2),
-              res=res))
+  return(list(raw=list(res=dcplR), res=res))
 }
 
 
