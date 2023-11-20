@@ -35,7 +35,7 @@ getMethods <- function(onlyTop=FALSE){
   return(c( "chromVAR", "monaLisa", "StabSel", "GSEA", "decoupleR", 
             "VIPER", "VIPERb", "msVIPER", "msVIPERb",
             "ulm", "ulmB", "ulmGC", "regreg", "regregR",
-            "BaGFoot", "MBA", "ATACseqTFEA" ))
+            "BaGFoot", "MBA", "ATACseqTFEA", "decoupleR>limma" ))
 }
 
 #' Run all methods on all datasets
@@ -181,6 +181,11 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
   seqlevelsStyle(peaks) <- seqStyle
   seqlevelsStyle(genome) <- seqStyle  
 
+  motifs <- fixMotifs(getNonRedundantMotifs("universal", spec=spec),
+                      spec=spec, scriptsFolder)
+  universalmotif::write_meme(motifs, mypath("others/motifs.meme",outSubfolder),
+                             overwrite=TRUE)
+  
   # use pmoi if available
   if(file.exists(pmoiPath <- mypath("others/pmoi.rds",outSubfolder)) && 
      !forceRerun){
@@ -337,7 +342,7 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
   
   # Compute differentially accessible regions required to run monaLisa, StabSel, fGSEA, VIPER, and msVIPER 
   
-  if (any(grepl("mona|Stab|GSEA|VIPER|decoupleR|ulm|regreg",methods))){
+  if (any(grepl("mona|Stab|GSEA|VIPER|decoupleR|ulm|regreg|TFEA",methods))){
     
     set.seed(rndSeed)
     npos <- sum(dataset$design == 1)
@@ -347,12 +352,17 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
     DAR <- dATestedgeR(counts_control, 
                        counts_perturbed, norm.method=DA.norm)
     
-    
-    
     # Generate required matrix of logFCs
-    
     DARmat <- as.numeric(DAR$logFC)
     names(DARmat) <- rownames(DAR)
+    
+    # Generate ranked list of regions
+    library(GenomicRanges)
+    DARegions <- as(row.names(DAR)[order(DAR$logFC)],"GRanges")
+    DARegions$rank <- seq_along(DARegions)
+    write.table(DARegions, mypath("others/ranked_regions.bed",outSubfolder),
+                quote=FALSE, sep="\t", row.names=FALSE, col.names=FALSE)
+    
   }
   
   # Start running methods
@@ -440,6 +450,19 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
     for(f in names(res$res))
       saveRDS(res$res[[f]],
               paste0("./runATAC_results/with_pvalues/decoupleR",f,".rds"))
+  }
+  
+  if ("decoupleR>limma" %in% methods){
+    
+    set.seed(rndSeed)
+    res <- rundecoupleR( counts, 
+                         genome, norm=DA.norm,
+                         motifs=pmoi, mode="sample",
+                         decoupleR_modes = decoupleR_modes )
+    saveRDS(res$raw, "./runATAC_results/raw/decoupleRlimma_raw.rds")
+    for(f in names(res$res))
+      saveRDS(res$res[[f]],
+              paste0("./runATAC_results/with_pvalues/decoupleRlimma",f,".rds"))
   }
   
   # Run monaLisa 
