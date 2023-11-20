@@ -85,3 +85,32 @@ runmonaLisa <- function(DAR, motifs, peaks, genome, nBins=11, minAbsLfc=0.3,
   
 }
 
+
+
+# legacy, for testing pval aggregation variants
+getMLglobalP <- function(ml, method=c("simes","cauchy","weighted.cauchy","geomean")){
+  method <- match.arg(method)
+  simes <- function(pval){ 
+    min((length(pval)*pval[order(pval)])/seq(from=1, to=length(pval), by=1))
+  }
+  MLp <- 10^-assays(ml)$negLog10P[,-which(colData(ml)$bin.nochange)]
+  i <- seq_len(ncol(MLp))
+  il <- split(i,cut(i,2))
+  apply(MLp, 1, FUN=function(x){
+    if(min(x[il[[1]]],na.rm=TRUE)>min(x[il[[2]]],na.rm=TRUE)){
+      x <- x[il[[2]]]
+      weights <- seq_along(x)
+    }else{
+      x <- x[il[[1]]]
+      weights <- rev(seq_along(x))
+    }
+    w <- which(!is.na(x))
+    if(length(w)==0) return(NA)
+    switch(method,
+      simes=simes(x[w]),
+      cauchy=ACAT::ACAT(x[w]),
+      weighted.cauchy=ACAT::ACAT(x[w], weights=weights[w]),
+      geomean=10^mean(log10(x)))
+  })
+}
+
