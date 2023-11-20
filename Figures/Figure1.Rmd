@@ -14,6 +14,7 @@ suppressPackageStartupMessages({
 source("../Scripts/plot.R")
 source("../Scripts/runMethods.R")
 res <- readRDS("../fullFrags/results.rds")
+res <- res[which(res$method!="Ridge-lm"),] # redundant with lasso...
 ```
 
 ```{r, fig.width=9, fig.height=10}
@@ -35,7 +36,7 @@ pr <- sensFDRplot(res2) +
 fig <- cowplot::plot_grid(
   h,
   plot_grid(pr, rtplot, labels=LETTERS[2:3], nrow=1, scale=0.95, rel_widths=c(4,3.5)),
-  nrow=2, labels=c("A",NA), scale=c(0.95,1), rel_heights = c(6,3)
+  nrow=2, labels=c("A",NA), scale=c(0.95,1), rel_heights = c(7,3)
 )
 fig
 ```

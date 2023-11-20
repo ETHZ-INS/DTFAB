@@ -33,7 +33,7 @@ p1 <- ggplot(cv, aes(absMaxDeviation, logFC, colour=-log10(adj.P.Val), label=TF)
 
 
 ```{r}
-mlse <- readRDS("../TRAFTAC/monaLisa.SE.rds")
+mlse <- readRDS("../TRAFTAC/monaLisa.GCsmoothQ.SE.rds")
 cv$ml.p <- rowData(mlse)[row.names(cv),"simes.p"]
 wNoZ <- which(!mlse$bin.nochange)
 mlp <- (1-10^-assay(mlse,"negLog10P")[,wNoZ])
@@ -54,11 +54,11 @@ selected <- readRDS("../TRAFTAC/stabSel.selected.rds")
 # NF2L1 removed due infinite value causing monaLisa plotting error
 uMo <- setdiff(intersect(union(selected, c(row.names(cv2), "RARB")), row.names(mlse)), "NF2L1")
 hl <- plotMotifHeatmaps(x = mlse[uMo,],
-                  which.plots = c("log2enr","negLog10P"), width.seqlogo=2,
+                  which.plots = c("log2enr","negLog10P","pearsonResid"), width.seqlogo=2,
                   width = 1.25, cluster = TRUE, doPlot=FALSE,
                   column_title_gp=gpar(fontsize=11),
                   show_motif_GC = FALSE, show_seqlogo = TRUE)
-hl$chromVAR <- sechm(dev, uMo, assayName = "z", do.scale=TRUE, 
+hl[[4]] <- sechm(dev, uMo, assayName = "z", do.scale=TRUE, 
                        column_title_gp=gpar(fontsize=11), column_title="chromVAR",
                        width=unit(0.7, "in"), row_names_gp=gpar(fontsize=10))
 p3 <- grid.grabExpr(draw(Reduce("+",hl), merge=TRUE))
@@ -73,7 +73,7 @@ pp <- plot_grid(
   nrow=2, rel_heights=c(4,5.5), labels=c(NA,"C")
 )
 pp
-pdf("Figure4.pdf", height=8.5, width=8.5)
+pdf("Figure5.pdf", height=8.5, width=8.5)
 pp
 dev.off()
 ```
