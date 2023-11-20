@@ -25,8 +25,9 @@ rankHeatmap2 <- function(res, rankBreaks=c(1,10,30,75,150,300,600), ...,
     rankmImputed[which(is.na(rankm[,i])),i] <- imput[i]
   ro <- row.names(rankm)[order(rowMeans(rankmImputed, na.rm=TRUE))]
   column_order <- names(sort(-colMeans(rankm, na.rm=TRUE)))
-  LFCbased <- grepl("GSEA|ulm|msViper|decoupleR|MonaLisa|diffTF|-lm",
-                    row.names(rankm),ignore.case=TRUE)
+  LFCbased <- grepl("GSEA|ulm|msViper|decoupleR:|MonaLisa|diffTF|-lm",
+                    row.names(rankm),ignore.case=TRUE) &
+    !grepl("decoupleR.+limma",row.names(rankm),ignore.case=TRUE)
   ancols <- list(type=c(deletion="darkorange3", dTag="black", ligand="darkslateblue"),
                  LFCbased=c("FALSE"="white", "TRUE"="brown4"))
   colan <- HeatmapAnnotation(df = datasetInfo[colnames(rankm),,drop=FALSE],
@@ -210,8 +211,16 @@ renameMethods <- function(x, renaming=NULL){
     CVdevNorm="chromVAR(deviations)>scale>limma", CVdevqt="chromVAR(deviations)>Qt>limma"
   )
   for(i in names(renaming)) x <- replace(x, x==i, renaming[[i]])
-  x <- gsub("decoupleR","decoupleR:",x)
+  x <- gsub("decoupleR","decoupleR(",x,fixed=TRUE)
+  w <- grepl("decoupleR",x,fixed=TRUE)
+  x[w] <- paste0(x[w],")")
+  w <- grepl("decoupleR(limma",x,fixed=TRUE)
+  x <- gsub("decoupleR(limma","decoupleR(",x,fixed=TRUE)
+  x[w] <- paste0(x[w],">limma")
   x <- gsub("::",":",x,fixed=TRUE)
+  x <- gsub("((","(",x,fixed=TRUE)
+  x <- gsub("))",")",x,fixed=TRUE)
+  x <- gsub(">limma)",">limma",x,fixed=TRUE)
   x
 }
 
@@ -242,8 +251,8 @@ getMainMethods <- function(){
     `chromVAR(z)>Qt>limma` = "chromVAR-adjusted", diffTF="diffTF",
     monaLisa.vsOthers = "monaLisa", monaLisa.StabSel = "monaLisa.StabSel", 
     `msVIPER(scores)` = "msVIPER", `VIPER(binary)>limma` = "VIPER", 
-    `decoupleR:consensus` = "decoupleR", fGSEA = "fGSEA",
-    insertionModel="insertionModel", ulmB="ulm","Lasso-lm"="Lasso",
-    "BaGFootLike"="BaGFootLike")
+    `decoupleR(consensus)` = "decoupleR(consensus)", `decoupleR(mlm)>limma` = "decoupleR(mlm)>limma", 
+    fGSEA = "fGSEA", insertionModel="insertionModel", ulmB="ulm",
+    "Lasso-lm"="Lasso", "BaGFootLike"="BaGFootLike")
 }
 
