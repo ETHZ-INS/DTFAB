@@ -31,7 +31,7 @@ getDatasets <- function(onlyPE=FALSE){
 getMethods <- function(onlyTop=FALSE){
   if(onlyTop)
     return(c("chromVAR", "minaLisa.others", "monaLisa.zero", "StabSel", 
-             "msVIPER", "MBA"))
+             "msVIPER"))
   return(c( "chromVAR", "monaLisa", "StabSel", "GSEA", "decoupleR", 
             "VIPER", "VIPERb", "msVIPER", "msVIPERb",
             "ulm", "ulmB", "ulmGC", "regreg", "regregR",
