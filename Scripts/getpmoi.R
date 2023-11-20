@@ -33,7 +33,34 @@ getNonRedundantMotifs <- function(format=c("PFMatrix","universal","PWMatrix"),
   )
 }
 
-#' Title
+fixMotifs <- function(motifs, spec, srcFolder="../../Scripts/"){
+  # choose the file that contains the correct names from HOCOMOCO v11
+  if (spec=="Hsapiens") {
+    motifnames <- fread(file.path(srcFolder, "HOCOMOCOv11_core_annotation_HUMAN_mono.tsv"))
+  } else if (spec=="Mmusculus") {
+    motifnames <- fread(file.path(srcFolder, "HOCOMOCOv11_core_annotation_MOUSE_mono.tsv"))
+  }
+  BANP_motif <- readRDS(file.path(srcFolder, "BANP.PFMatrix.rds"))
+  BANP_universalmotif <- convert_motifs(BANP_motif,
+                                        class="universalmotif-universalmotif")
+  motifs$BANP <- BANP_universalmotif
+  if(!("NR1H3" %in% names(motifs)))
+    motifs$NR1H3 <- convert_motifs(
+      readRDS(file.path(srcFolder, "NR1H3.PWMatrix.rds")),
+      class = "universalmotif-universalmotif")
+  
+  # Correct inconvential names for motifs
+  for (i in seq_along(motifs)){ 
+    for (j in seq_along(motifnames$Model)) {
+      if (motifs[[i]]@altname == motifnames$Model[[j]])
+        names(motifs)[[i]] <- motifnames$`Transcription factor`[[j]]
+    }
+  }  
+  
+  motifs
+}
+
+#' Get motif matches
 #'
 #' @param genome A BSgenome respective to the genome used for the alignment.
 #' @param peakpath The path to the merged ATAC-seq peaks from control and treatment conditions.
@@ -51,12 +78,6 @@ getpmoi <- function(genome,
                     seqStyle=c("ensembl","UCSC"),
                     srcFolder){
   seqStyle <- match.arg(seqStyle)
-  # choose the file that contains the correct names from HOCOMOCO v11
-  if (spec=="Hsapiens") {
-    motifnames <- fread(file.path(srcFolder, "HOCOMOCOv11_core_annotation_HUMAN_mono.tsv"))
-  } else if (spec=="Mmusculus") {
-    motifnames <- fread(file.path(srcFolder, "HOCOMOCOv11_core_annotation_MOUSE_mono.tsv"))
-  }
   
   if(is.character(peaks)){
     peals <- sort(rtracklayer::import(peaks))
@@ -69,29 +90,12 @@ getpmoi <- function(genome,
   
   # Get the motifs in universal format required by memes
   motifs <- getNonRedundantMotifs("universal", species = spec)
-  
-  BANP_motif <- readRDS(file.path(srcFolder, "BANP.PFMatrix.rds"))
-  BANP_universalmotif <- convert_motifs(BANP_motif,
-                                        class="universalmotif-universalmotif")
-  motifs$BANP <- BANP_universalmotif
-  if(!("NR1H3" %in% names(motifs)))
-    motifs$NR1H3 <- convert_motifs(
-      readRDS(file.path(srcFolder, "NR1H3.PWMatrix.rds")),
-      class = "universalmotif-universalmotif")
-  
-  # Correct inconvential names for motifs
-  for (i in seq_along(motifs)){ 
-    for (j in seq_along(motifnames$Model)) {
-      if (motifs[[i]]@altname == motifnames$Model[[j]])
-        names(motifs)[[i]] <- motifnames$`Transcription factor`[[j]]
-    }
-  }
+  motifs <- fixMotifs(motifs, spec, srcFolder)
   
   # Obtain the positions of motif instances which are later required as input for runATAC
   pmoi <- runFimo(peak_seqs, 
                   motifs, 
                   meme_path="/common/meme/bin/", 
                   skip_matched_sequence=TRUE)
-  try(saveRDS(pmoi, "./runATAC_results/others/pmoi.rds"), silent=TRUE)
   return(pmoi)
-  }
+}
