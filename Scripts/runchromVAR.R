@@ -46,8 +46,7 @@ runchromVAR <- function(counts,
                            annotations = motif_matrix,
                            expectation = computeExpectations(counts_filtered),
                            background_peaks=getBackgroundPeaks(counts_filtered, 
-                                                               niterations=2000),
-                           TMM = TMM)
+                                                               niterations=2000))
   
   # Compute variability
   
