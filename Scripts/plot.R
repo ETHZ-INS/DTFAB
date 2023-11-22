@@ -13,7 +13,8 @@ rankHeatmap <- function(res, rankBreaks=c(1,6,20,50,100,200,400), squeeze=FALSE)
 rankHeatmap2 <- function(res, rankBreaks=c(1,10,30,75,150,300,600), ..., 
                          column_title="Datasets", doDraw=TRUE, rowann=NULL,
                          datasetInfo=data.frame(
-                          type=sapply(getDatasets(), FUN=function(x) x$type))){
+                          type=sapply(getDatasets(), FUN=function(x) x$type)),
+                         cellLabelFontsize=8){
   library(ComplexHeatmap)
   rankm <- reshape2::dcast(res, method~dataset, value.var="rank")
   row.names(rankm) <- rankm[,1]
@@ -25,20 +26,19 @@ rankHeatmap2 <- function(res, rankBreaks=c(1,10,30,75,150,300,600), ...,
     rankmImputed[which(is.na(rankm[,i])),i] <- imput[i]
   ro <- row.names(rankm)[order(rowMeans(rankmImputed, na.rm=TRUE))]
   column_order <- names(sort(-colMeans(rankm, na.rm=TRUE)))
-  LFCbased <- grepl("GSEA|ulm|msViper|decoupleR:|MonaLisa|diffTF|-lm",
-                    row.names(rankm),ignore.case=TRUE) &
-    !grepl("decoupleR.+limma",row.names(rankm),ignore.case=TRUE)
-  ancols <- list(type=c(deletion="darkorange3", dTag="black", ligand="darkslateblue"),
-                 LFCbased=c("FALSE"="white", "TRUE"="brown4"))
+  ancols <- list(type=c(deletion="darkorange3", dTag="black", ligand="darkslateblue"))
   colan <- HeatmapAnnotation(df = datasetInfo[colnames(rankm),,drop=FALSE],
                              col=ancols, show_annotation_name=FALSE)
   bdist <- log10(rankBreaks[-1]-rankBreaks[-length(rankBreaks)])
+  rann <- getMethodAnno(row.names(rankm))
   if(is.null(rowann))
-    rowann <- rowAnnotation(df=as.data.frame(LFCbased), col=ancols, show_legend=FALSE)
+    rowann <- rowAnnotation(df=rann$df, col=rann$col,
+                            show_legend=colnames(rann$df)=="family")
   h <- ComplexHeatmap::Heatmap(rankm, cluster_rows=FALSE, cluster_columns=FALSE,
           cell_fun=function(j, i, x, y, width, height, fill) {
             grid.text(sprintf("%1.0f", rankm[i, j]^2), x, y,
-                      gp = gpar(fontsize=ifelse(is.na(rankm[i, j]),6,8)))
+                      gp = gpar(fontsize=ifelse(is.na(rankm[i, j]),6,
+                                                cellLabelFontsize)))
           },
      col=viridisLite::viridis(100, direction=-1), name="Rank of\ntrue TF",
      column_title=column_title, row_order=ro, column_order=column_order, ..., 
@@ -109,7 +109,7 @@ relAUCplot <- function(res, squeeze=FALSE){
 
 relAUCplot2 <- function(res, doDraw=TRUE, column_title="Datasets", 
                         column_order=NULL, row_order=NULL, ..., 
-                        type=c("propOfMax","MAD","relAUC"),
+                        type=c("propOfMax","MAD","relAUC"), cellLabelFontsize=8,
                         datasetInfo=data.frame(
                            type=sapply(getDatasets(), FUN=function(x) x$type))){
   type <- match.arg(type)
@@ -144,7 +144,9 @@ relAUCplot2 <- function(res, doDraw=TRUE, column_title="Datasets",
         v <- gsub("^0","",round(m1[i,j],2))
         if(is.na(v)) v <- "."
         if(v=="") v <- "0"
-        grid.text(v, x, y, gp=gpar(fontsize=8,
+        if(v=="NaN") v <- "NA"
+        grid.text(v, x, y, gp=gpar(fontsize=ifelse(is.na(m1[i,j]),6,
+                                                   cellLabelFontsize),
                                    col=ifelse(m[i,j]<0.5,"lightgrey","black")))
       },
       col=viridisLite::magma(100),
@@ -256,3 +258,24 @@ getMainMethods <- function(){
     "Lasso-lm"="Lasso", "BaGFootLike"="BaGFootLike")
 }
 
+
+getMethodAnno <- function(methods){
+  methods <- unique(methods)
+  LFCbased <- grepl("GSEA|ulm|msViper|decoupleR:|MonaLisa|diffTF|-lm",
+                    methods,ignore.case=TRUE) &
+    !grepl("decoupleR.+limma",methods,ignore.case=TRUE)
+  family <- grepl("chromVAR",methods) + 10*grepl("monaLisa",methods) +
+    100*grepl("decoupleR",methods) + 1000*grepl("VIPER",methods)
+  family <- factor(family, c(1,10,100,1000,0),
+                   c("chromVAR", "monaLisa", "decoupleR", "VIPER", "other"))
+  ancols <- list(type=c(deletion="darkorange3", dTag="black", ligand="darkslateblue"),
+                 family=setNames(c("#332288", "#88CCEE", "#117733", "#DDCC77", "#CC6677"),
+                                 levels(family)),
+                 LFCbased=c("FALSE"="white", "TRUE"="brown4"))
+  df <- data.frame(row.names=methods, LFCbased=LFCbased, family=family)
+  if(any(grepl("^>GC", methods))){
+    df$GCsmoothQ <- grepl("^GC>",methods)
+    ancols$GCsmoothQ <- ancols$LFCbased
+  }
+  list(df=df, col=ancols)
+}

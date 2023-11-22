@@ -84,6 +84,9 @@ respective motif.
 \newpage
 
 
+
+
+
 # `r getFigNb(TRUE)`
 
 ```{r}
@@ -301,7 +304,7 @@ square-root transformed. TF in blue show an improvement, while those in red show
 a worsening, and those in black are unchanged.
 
 
-
+\newpage
 
 
 
@@ -361,7 +364,32 @@ but sometimes detrimental, and quantile normalization also tends to be beneficia
 
 
 
+\newpage
 
+
+# `r getFigNb(TRUE)`
+
+```{r, fig.width=8, fig.height=9}
+res1 <- readRDS("../fullFrags/results.rds")
+res2 <- readRDS("../GCnorm/results.rds")
+res2$method <- paste0("GC>",res2$method)
+res1$norm <- "TMM"
+res2$norm <- "GCsmoothQuantile"
+res <- rbind(res1,res2)
+
+h1 <- rankHeatmap2(res, doDraw=FALSE, column_title="Rank of true TF",
+                   row_names_gp=gpar(fontsize=8.5), cellLabelFontsize=7)
+h2 <- suppressWarnings(relAUCplot2(res, row_order=names(row_order(h1)), doDraw=FALSE,
+                  column_title="Network score", column_order=names(column_order(h1)),
+                  cellLabelFontsize=7))
+h <- grid.grabExpr(draw(h1 + h2, merge=TRUE))
+plot_grid(h, scale=0.95)
+```
+
+**`r getFigNb()` : Rank-based metrics of all variants, including smooth quantile normalization in GC bins.**
+
+
+\newpage
 
 # `r getFigNb(TRUE)`
 
