@@ -1,0 +1,44 @@
+---
+title: "Benchmark results"
+author: "Pierre-Luc Germain"
+date: "10/10/2023"
+output: html_document
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(ggplot2)
+})
+source("../Scripts/compileBenchmark.R")
+source("../Scripts/runMethods.R")
+source("../Scripts/plot.R")
+interactors <- readRDS("../Scripts/allInteractors.rds")
+```
+
+```{r, eval=FALSE}
+datasets <- getDatasets()
+res <- compileBenchmark(datasets, interactors=interactors)
+res <- renameMethods(res)
+res <- res[res$method!="dev" & !grepl("trend$",res$method),]
+# time was recorded only for the main chromVAR variants, so use that for all
+cvtime <- colMeans(as.matrix(
+  reshape2::dcast(res[grep("chromVAR",res$method),], formula=method~dataset,
+                  value.var="cpu")[,-1]), na.rm=TRUE)
+cvelapsed <- colMeans(as.matrix(
+  reshape2::dcast(res[grep("chromVAR",res$method),], formula=method~dataset,
+                  value.var="elapsed")[,-1]), na.rm=TRUE)
+for(f in names(cvtime)){
+  res$cpu[which(grepl("chromVAR",res$method) & is.na(res$cpu) & res$dataset==f)] <- cvtime[[f]]
+  res$elapsed[which(grepl("chromVAR",res$method) & is.na(res$elapsed) & res$dataset==f)] <- cvelapsed[[f]]
+}
+saveRDS(res, "results.rds")
+res3 <- filterMethods(res)
+```
+
+
+```{r, fig.width=8, fig.height=7, eval=FALSE}
+# quick check
+res <- readRDS("results.rds")
+rankHeatmap2(res)
+```
+

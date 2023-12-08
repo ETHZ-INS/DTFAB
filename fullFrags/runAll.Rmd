@@ -1,0 +1,22 @@
+---
+title: "Benchmark using all fragments"
+author: "Pierre-Luc Germain"
+date: "10/9/2023"
+output: html_document
+---
+
+```{r}
+source("../Scripts/runMethods.R")
+datasets <- getDatasets()
+res <- runAll(datasets)
+```
+
+```{r}
+runCVariants(datasets)
+```
+
+
+```{r}
+sessionInfo()
+```
+

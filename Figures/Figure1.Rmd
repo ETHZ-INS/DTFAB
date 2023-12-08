@@ -24,8 +24,7 @@ h2 <- suppressWarnings(relAUCplot2(res, row_order=names(row_order(h1)), doDraw=F
 h <- grid.grabExpr(draw(h1 + h2, merge=TRUE))
 res2 <- filterMethods(res, rename=FALSE)
 res2$method <- gsub(":","",res2$method)
-res2[res2$method=="diffTF","elapsed"] <- Inf
-rtplot <- runtimePlot2(res2) + annotate("text", x=1200, y="diffTF", label=">>days") +
+rtplot <- runtimePlot2(res2) + 
   scale_x_continuous(breaks=c(5,60,180,360,600,1200),
                      minor_breaks=c(1,30,120,270,480,900,1500)) +
   coord_trans(x="sqrt", xlim=c(1,1400)) + theme(legend.position=c(0.75,0.2))

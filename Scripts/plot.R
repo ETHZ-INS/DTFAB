@@ -210,7 +210,8 @@ renameMethods <- function(x, renaming=NULL){
     msVIPER="msVIPER(scores)", msVIPERb="msVIPER(binary)", ulmGC="ulm+GC", 
     ulmB="ulm(binary)", ulm="ulm(scores)", MBA="insertionModel", GSEA="fGSEA",
     CVdev="chromVAR(deviations)>limma", CVdevCentered="chromVAR(deviations)>center>limma",
-    CVdevNorm="chromVAR(deviations)>scale>limma", CVdevqt="chromVAR(deviations)>Qt>limma"
+    CVdevNorm="chromVAR(deviations)>scale>limma", CVdevqt="chromVAR(deviations)>Qt>limma",
+    diffTF="diffTF(permutations)", diffTF_noPerm="diffTF(analytic)"
   )
   for(i in names(renaming)) x <- replace(x, x==i, renaming[[i]])
   x <- gsub("decoupleR","decoupleR(",x,fixed=TRUE)
@@ -255,7 +256,9 @@ getMainMethods <- function(){
     `msVIPER(scores)` = "msVIPER", `VIPER(binary)>limma` = "VIPER", 
     `decoupleR(consensus)` = "decoupleR(consensus)", `decoupleR(mlm)>limma` = "decoupleR(mlm)>limma", 
     fGSEA = "fGSEA", insertionModel="insertionModel", ulmB="ulm",
-    "Lasso-lm"="Lasso", "BaGFootLike"="BaGFootLike")
+    "Lasso-lm"="Lasso", "BaGFootLike"="BaGFootLike",
+    "diffTF(analytic)"="diffTF(analytic)", 
+    "diffTF(permutations)"="diffTF(permutations)")
 }
 
 

@@ -14,9 +14,12 @@ suppressPackageStartupMessages({
   library(sechm)
   library(limma)
   library(ggplot2)
+  library(edgeR)
 })
 source("../Scripts/getpmoi.R")
 source("../Scripts/runStabSel.R")
+source("../Scripts/GCnorm.R")
+source("../Scripts/differentialAccessibility.R")
 genome <- Rsamtools::FaFile("/reference/Homo_sapiens/Ensembl/GRCh38.p10/Sequence/WholeGenomeFasta/Homo_sapiens.GRCh38.dna.toplevel.fa")
 ```
 
@@ -116,10 +119,7 @@ mlse <- calcBinnedMotifEnrR(seqs = DARseqs,
                             pwmL = motifs, 
                             BPPARAM = BiocParallel::MulticoreParam(8),
                             background = "zeroBin")
-  
-simes <- function(pval){ 
-  min((length(pval)*pval[order(pval)])/seq(from=1, to=length(pval), by=1))
-}
+
 MLp <- 10^-assays(mlse)$negLog10P[,-which(colData(mlse)$bin.nochange)]
 rowData(mlse)$simes.p <- apply(MLp, 1, simes)
 rowData(mlse)$simes.padj <- p.adjust(rowData(mlse)$simes.p, method="fdr")
@@ -127,8 +127,61 @@ mlse <- mlse[order(rowData(mlse)$simes.p),]
 saveRDS(mlse, "monaLisa.vsZero.SE.rds")
 ```
 
+```{r, eval=FALSE}
+se <- readRDS("peakCounts.SE.rds")
+se <- keepStandardChromosomes(se, "Homo_sapiens", pruning.mode="coarse")
+da <- dATestedgeR(se[,1:2], se[,3:4], norm.method="GCSmoothQuantile")
+rowData(se)$DEA.withGCsmoothQ <- da
+
+motifs <- getNonRedundantMotifs(species="Hsapiens", format="PWMatrix")
+peaks <- granges(se)
+names(peaks) <- row.names(se)
+
+peaks$logFC <- jitter(da[names(peaks),"logFC"], 0.001) # To avoid non-unique breaks
+fc2 <- peaks$logFC[which(abs(peaks$logFC)>=0.2)]
+bins <- monaLisa::bin(x=peaks$logFC, 
+                      binmode = "equalN", 
+                      nElements = ceiling(length(fc2)/10),
+                      minAbsX = 0.2)
+  
+#plotBinDensity(peaks$logFC, bins)
+
+DARseqs <- getSeq(genome, peaks)
+names(DARseqs) <- names(peaks)
+  
+plotBinDiagnostics(seqs=DARseqs, bins=bins, aspect="dinucfreq")
+# strong GC-bias...
+  
+mlse <- calcBinnedMotifEnrR(seqs = DARseqs, 
+                            bins = bins, 
+                            pwmL = motifs, 
+                            BPPARAM = BiocParallel::MulticoreParam(8),
+                            background = "otherBins")
+  
+
+MLp <- 10^-assays(mlse)$negLog10P[,-which(colData(mlse)$bin.nochange)]
+rowData(mlse)$simes.p <- apply(MLp, 1, simes)
+rowData(mlse)$simes.padj <- p.adjust(rowData(mlse)$simes.p, method="fdr")
+mlse <- mlse[order(rowData(mlse)$simes.p),]
+saveRDS(mlse, "monaLisa.GCsmoothQ.SE.rds")
+
+mlse <- calcBinnedMotifEnrR(seqs = DARseqs, 
+                            bins = bins, 
+                            pwmL = motifs, 
+                            BPPARAM = BiocParallel::MulticoreParam(8),
+                            background = "zeroBin")
+
+MLp <- 10^-assays(mlse)$negLog10P[,-which(colData(mlse)$bin.nochange)]
+rowData(mlse)$simes.p <- apply(MLp, 1, simes)
+rowData(mlse)$simes.padj <- p.adjust(rowData(mlse)$simes.p, method="fdr")
+mlse <- mlse[order(rowData(mlse)$simes.p),]
+saveRDS(mlse, "monaLisa.GCsmoothQ.vsZero.SE.rds")
+```
+
+
 ```{r}
-mlse <- readRDS("monaLisa.SE.rds")
+mlse <- readRDS("monaLisa.GCsmoothQ.SE.rds")
+
 plotMotifHeatmaps(x=head(mlse,10), which.plots=c("log2enr", "negLog10P"), 
                   width = 2.0, cluster = TRUE)
 ```
@@ -204,5 +257,21 @@ ggplot(d2, aes(position, sm.mean, group=sample, colour=condition)) + geom_line(l
   theme_bw() + theme(legend.position = "bottom") + scale_x_continuous(expand=expansion()) +
   labs(x="Position around motif", y="Normalized insertion sites density")
 
+```
+
+
+
+
+
+```{r}
+e <- sapply(setNames(names(ds),names(ds)), FUN=function(d){
+  ml <- readRDS(paste0("../fullFrags/",d,"/runATAC_results/raw/ML_raw.rds"))[[1]]
+  ml <- ml[order(getMLglobalP(ml)),]
+  rank1 <- head(which(row.names(ml) %in% ds[[d]]$truth),1)
+  #ml <- ml[order(getMLglobalP(ml, method="weighted.cauchy")),]
+  ml <- ml[order(getMLglobalP(ml, method="wgeomean")),]
+  rank2 <- head(which(row.names(ml) %in% ds[[d]]$truth),1)
+  c(simes=rank1, wcauchy=rank2)
+})
 ```
 

@@ -35,7 +35,7 @@ gcqn <- function(counts, gcGroups, summary='mean', round=TRUE){
     return(gcBinNormCounts)
 }
 
-gcqn_qsmooth <- function(counts, gcGroups, bio){
+gcqn_qsmooth <- function(counts, gcGroups, bio, round=TRUE){
     gcBinNormCounts <- matrix(NA, nrow=nrow(counts), ncol=ncol(counts), 
         dimnames=list(rownames(counts),colnames(counts)))
     for(ii in 1:nlevels(gcGroups)){
@@ -43,8 +43,8 @@ gcqn_qsmooth <- function(counts, gcGroups, bio){
         countBin <- counts[id,]
         qs <- qsmooth::qsmooth(countBin, group_factor=bio)
         normCountBin <- qs@qsmoothData
-        normCountBin <- round(normCountBin)
-        normCountBin[normCountBin<0] <- 0
+        if(round) normCountBin <- round(normCountBin)
+        normCountBin[normCountBin<0L] <- 0L
         gcBinNormCounts[id,] <- normCountBin
     }
     return(gcBinNormCounts)

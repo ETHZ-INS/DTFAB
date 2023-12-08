@@ -11,13 +11,20 @@ allints <- readRDS("../Scripts/allInteractors.rds")
 ```
 
 ```{r}
-getResults <- function(datasets, methods=c("CVqt","ML"), ...){
+getResults <- function(datasets, methods=c("CVqt","ML","GCnorm:decoupleRlimmamlm"), ...){
   lapply(setNames(names(datasets),names(datasets)), FUN=function(x){
     print(x)
     res <- lapply(setNames(methods, methods), FUN=function(y){
-      readRDS(file.path("..","fullFrags",x,"runATAC_results","with_pvalues",paste0(y,".rds")))
+      folder <- ifelse(grepl("GCnorm:",y), "GCnorm","fullFrags")
+      y <- gsub("GCnorm:","",y,fixed=TRUE)
+      p <- file.path("..",folder,x,"runATAC_results","with_pvalues",paste0(y,".rds"))
+      # if(!file.exists(p)){
+      #   folder <- "fullFrags"
+      #   p <- file.path("..",folder,x,"runATAC_results","with_pvalues",paste0(y,".rds"))
+      # }
+      readRDS(p)
     })
-    ag <- runAggregations(res)#, ...)
+    ag <- runAggregations(res, ...)
     truth <- x
     if(!is.null(datasets[[x]]$truth)) truth <- datasets[[x]]$truth
     out <- lapply(list(original=res, aggregated=ag), FUN=function(res){
@@ -29,15 +36,6 @@ getResults <- function(datasets, methods=c("CVqt","ML"), ...){
 
 
 ```{r}
-bml <- getResults(getDatasets(), methods=c("CVqt","MLStabSel"))
-bml2 <- dplyr::bind_rows(lapply(bml, FUN=function(x){
-  dplyr::bind_rows(lapply(x, FUN=function(y) dplyr::bind_rows(y, .id="method")),
-                   .id="type")
-}), .id="dataset")
-bml2$type <- factor(bml2$type, c("original","aggregated"), c("original methods", "aggregation methods"))
-saveRDS(bml2, "CV_stabSel_aggregated.bm.rds")
-
-
 bml <- getResults(getDatasets())
 bml2 <- dplyr::bind_rows(lapply(bml, FUN=function(x){
   dplyr::bind_rows(lapply(x, FUN=function(y) dplyr::bind_rows(y, .id="method")),

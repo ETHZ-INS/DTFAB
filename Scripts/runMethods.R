@@ -844,12 +844,7 @@ runCVariants <- function(datasets){
       dimnames(qt) <- dimnames(assays(dev)$deviations)
       assays(dev)$devqt <- qt
       
-      ass <- c("CV"="z", "CVcentered"="centered", "CVnorm"="norm", "CVqt"="qt",
-               "CVdev"="deviations", "CVdevNorm"="devnorm", "CVdevCentered"="devcentered", "CVdevqt"="devqt" )
-      design <- c(rep(-1, ncol(dev)/2), rep(1, ncol(dev)/2))
-      for(f in names(ass)){
-        devMat <- assays(dev)[[ass[[f]]]]
-        fit <- eBayes(lmFit(devMat, design))
+      limma2df <- function(fit){
         CVsel <- topTable(fit, number=Inf)
         CVdf <- data.frame(row.names = rownames(CVsel),
                            logFC = CVsel[, "logFC"], 
@@ -857,7 +852,20 @@ runCVariants <- function(datasets){
                            p = CVsel[, "P.Value"],
                            t = CVsel[, "t"])
         CVdf$rank = seq_along(row.names(CVdf))
+        CVdf
+      }
+      
+      ass <- c("CV"="z", "CVcentered"="centered", "CVnorm"="norm", "CVqt"="qt",
+               "CVdev"="deviations", "CVdevNorm"="devnorm", "CVdevCentered"="devcentered", "CVdevqt"="devqt" )
+      design <- c(rep(-1, ncol(dev)/2), rep(1, ncol(dev)/2))
+      for(f in names(ass)){
+        devMat <- assays(dev)[[ass[[f]]]]
+        fit1 <- lmFit(devMat, design)
+        CVdf <- limma2df(eBayes(fit1))
         saveRDS(CVdf, file.path(dn, "runATAC_results", "with_pvalues", paste0(f, ".rds")))
+        # fit1$Amean <- rowMeans(abs(assay(dev)))
+        # CVdf <- limma2df(eBayes(fit1, trend=TRUE))
+        # saveRDS(CVdf, file.path(dn, "runATAC_results", "with_pvalues", paste0(f, "trend.rds")))
       }
       dev$condition <- factor(design)
       dd <- chromVAR::differentialDeviations(dev, "condition")
