@@ -35,9 +35,13 @@ getBenchmarkMetrics <- function(dataset, path=head(dataset$truth,1),
   names(fl) <- gsub("_raw\\.rds$","",basename(fl))
   rt <- sapply(fl, FUN=function(x){
     x <- readRDS(x)
-    if(!is.null(names(x)) && "runtime" %in% names(x))
-      return(x$runtime)
-    return(x[[2]])
+    if(!is.null(names(x)) && "runtime" %in% names(x)){
+      x <- x$runtime
+    }else{
+      x <- x[[2]]
+    }
+    if(is(x,"proc_time")) x <- summary(x)
+    x
   })
   rt <- rbind(elapsed=rt["elapsed",], cpu=colSums(rt[which(row.names(rt)!="elapsed"),]))
   rt <- as.data.frame(t(rt))
@@ -53,11 +57,13 @@ getBenchmarkMetrics <- function(dataset, path=head(dataset$truth,1),
     rt <- rbind(rt, data.frame(row.names=paste0("decoupleRlimma",names(dt)),
                                elapsed=dt, cpu=dt))
   }
+
   # get actual results
   fl <- list.files(file.path(path, resin, "with_pvalues"), full=TRUE)
   names(fl) <- gsub("\\.rds$","",basename(fl))
   res <- lapply(fl, readRDS)
   res <- res[sapply(res, FUN=function(x) isTRUE(nrow(x)>1))]
+  
   res <- dplyr::bind_rows(lapply(res, truth=dataset$truth, interactors=interactors,
                                  FUN=.getBenchmarkMetrics), .id="method")
   res$elapsed <- rt[res$method, "elapsed"]
@@ -80,7 +86,8 @@ getBenchmarkMetrics <- function(dataset, path=head(dataset$truth,1),
     trueQ <- x[w,"padj"]
   }
   x$isCofactor <- row.names(x) %in% cofactors
-  auc <- sum(cumsum(head(x$isCofactor,100))/seq_len(100))
+  tmp <- head(x$isCofactor,100)
+  auc <- sum(cumsum(tmp)/seq_along(tmp))
   if(is.null(x$padj)) x$padj <- x$adj.P.Val
   xsig <- x[which(x$padj<0.05),,drop=FALSE]
   data.frame(rank=w, trueQ=trueQ,
@@ -107,15 +114,44 @@ getAllInteractors <- function(datasets, extra=c("CEBPB", "MAZ", "ZNF143", "NR3C1
 
 
 
-transferDiffTFres <- function(infolder=".", outfolder){
+transferDiffTFres <- function(infolder=".", outfolder, noPerm=FALSE){
   lf <- list.files(infolder, pattern="\\.summary\\.tsv\\.gz", full=TRUE, recursive=TRUE)
+  if(noPerm){
+    lf <- lf[grepl("noPerm",lf)]
+  }else{
+    lf <- lf[!grepl("noPerm",lf)]
+  }
   m <- sapply(strsplit(dirname(lf),"/"),FUN=identity)
   names(lf) <- m[which.max(apply(m,1,FUN=function(x) length(unique(x)))),]
+  
+  if(file.exists(rtf <- paste0(infolder,"/diffTF_runtimes"))){
+    tt <- read.delim(rtf, sep=" ", row.names=1, header = FALSE)
+    colnames(tt)[1] <- "time"
+    tt$dataset <- gsub("/.+$","",row.names(tt))
+    tt$method <- sapply(strsplit(row.names(tt),"/"), FUN=function(x) x[2])
+    tt <- tt[tt$time>0,]
+    if(noPerm){
+      tt <- tt[grepl("noPerm",tt$method),]
+    }else{
+      tt <- tt[!grepl("noPerm",tt$method),]
+    }
+    row.names(tt) <- tt$dataset
+  }else{
+    tt <- NULL
+  }
+  
   for(x in names(lf)){
     a <- read.delim(lf[[x]])
     b <- data.frame(row.names=a$TF, wmdiff=a$weighted_meanDifference, p=a$pvalue, padj=a$pvalueAdj)
     b <- b[order(b$p, -abs(b$wmdiff)),]
     b$rank <- seq_len(nrow(b))
-    saveRDS(b, paste0(outfolder,"/",x,"/runATAC_results/with_pvalues/diffTF.rds"))
+    saveRDS(b, paste0(outfolder,"/",x,"/runATAC_results/with_pvalues/diffTF",
+                      ifelse(noPerm,"_noPerm",""),".rds"))
+    if(!is.null(tt) && x %in% row.names(tt)){
+      rt <- c(user=NA_integer_, system=NA_integer_, elapsed=tt[x,1])
+      rt <- list(res=NA, runtime=rt, runtime2=rt)
+      saveRDS(rt, paste0(outfolder,"/",x,"/runATAC_results/raw/diffTF",
+                         ifelse(noPerm,"_noPerm",""),"_raw.rds"))
+    }
   }
 }
