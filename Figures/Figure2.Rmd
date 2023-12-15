@@ -21,7 +21,8 @@ res <- renameMethods(res)
 
 
 ```{r}
-aTheme <- theme_bw() + theme(legend.position ="none", title=element_text(size=10), plot.title=element_text(size=10.5))
+aTheme <- theme_bw() + theme(legend.position ="none", title=element_text(size=10),
+                             plot.title=element_text(size=10.5))
 
 diff2Type <- function(x){
   factor(sign(x), c("-1","0","1"), c("worsened","same","improved"))
@@ -71,8 +72,11 @@ resFoN <- readRDS("../fullOnNucFreePeaks/results.rds")
 resFoN <- renameMethods(resFoN)
 resNF <- readRDS("../nucFree/results.rds")
 resNF <- renameMethods(resNF)
+resNFoF <- readRDS("../NFonFull/results.rds")
+resNFoF <- renameMethods(resNFoF)
 m <- merge(resFoN, resNF, by=c("dataset", "method"), suffix=c(".FoNF",".NF"))
-m <- merge(res, m, by=c("dataset","method"))
+m2 <- merge(res, resNFoF, by=c("dataset","method"), suffix=c("",".NFoF"))
+m <- merge(m, m2, by=c("dataset","method"))
 m <- m[m$method %in% c("chromVAR(z)>limma","monaLisa.vsOthers"),]
 m$diffsign <- diff2Type(-sign(m$rank.FoNF-m$rank))
 p3 <- ggplot(m, aes(rank, rank.FoNF, label=dataset, colour=diffsign)) + 
@@ -81,15 +85,23 @@ p3 <- ggplot(m, aes(rank, rank.FoNF, label=dataset, colour=diffsign)) +
   facet_wrap(~method) + scale_x_log10() + scale_y_log10() + aTheme + 
     scale_colour_manual(values=typecols) +
     labs(x="Rank of true motif (using all fragments)",
-         y="Rank of true motif\n(all fragments on nuc-free peaks)",
+         y="Rank of true motif\n(all frags on NF peaks)",
          colour="Change (in y relative to x):",
          title="Specifically using nucleosome-free fragments does not generally improve results")
+m$diffsign <- diff2Type(-sign(m$rank.NF-m$rank))
 p4 <- ggplot(m, aes(rank, rank.NF, label=dataset, colour=diffsign)) + 
     geom_abline(slope=1, colour="grey") + geom_point() + 
     ggrepel::geom_text_repel(min.segment.length=0, size=3, alpha=0.7) + 
   facet_wrap(~method) + scale_x_log10() + scale_y_log10() + aTheme +
     scale_colour_manual(values=typecols) +
-    labs(x="Rank of true motif (using all fragments)", y="Rank of true motif\n(only nuc-free fragments)")
+    labs(x="Rank of true motif (using all fragments)", y="Rank of true motif\n(only NF frags on NF peaks)")
+m$diffsign <- diff2Type(-sign(m$rank.NFoF-m$rank))
+p5 <- ggplot(m, aes(rank, rank.NFoF, label=dataset, colour=diffsign)) + 
+    geom_abline(slope=1, colour="grey") + geom_point() + 
+    ggrepel::geom_text_repel(min.segment.length=0, size=3, alpha=0.7) + 
+  facet_wrap(~method) + scale_x_log10() + scale_y_log10() + aTheme +
+    scale_colour_manual(values=typecols) +
+    labs(x="Rank of true motif (using all fragments)", y="Rank of true motif\n(only NF fragments)")
 ```
 
 
@@ -98,8 +110,8 @@ fig <- plot_grid(
   plot_grid(p1,p2, nrow=1, scale=0.95, labels="AUTO"),
   get_legend(p3 + theme(legend.position = "bottom") + 
                guides(colour=guide_legend(override.aes=list(size=3)))),
-  p3, p4, nrow=4, scale=c(1,1,0.95,0.95), labels=c(NA,NA,"C","D"),
-  rel_heights=c(1.1,0.2,1.1,1)
+  p3, p4, p5, nrow=5, scale=c(1,1,0.95,0.95,0.95), labels=c(NA,NA,"C","D","E"),
+  rel_heights=c(1.1,0.15,1.1,1,1)
 )
 fig
 ```
