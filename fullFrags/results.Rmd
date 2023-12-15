@@ -18,8 +18,8 @@ interactors <- readRDS("../Scripts/allInteractors.rds")
 ```{r, eval=FALSE}
 datasets <- getDatasets()
 res <- compileBenchmark(datasets, interactors=interactors)
+res <- res[res$method!="dev" & !grepl("trend$|ihw$|^CVb",res$method),]
 res <- renameMethods(res)
-res <- res[res$method!="dev" & !grepl("trend$",res$method),]
 # time was recorded only for the main chromVAR variants, so use that for all
 cvtime <- colMeans(as.matrix(
   reshape2::dcast(res[grep("chromVAR",res$method),], formula=method~dataset,
@@ -36,9 +36,15 @@ res3 <- filterMethods(res)
 ```
 
 
-```{r, fig.width=8, fig.height=7, eval=FALSE}
+```{r, fig.width=8, fig.height=10, eval=FALSE}
 # quick check
 res <- readRDS("results.rds")
 rankHeatmap2(res)
+```
+
+```{r, fig.width=7, fig.height=4}
+res3 <- res[grep("^CVdev|chromVAR",res$method),]
+res3 <- res3[!grepl("trend",res3$method),]
+rankHeatmap2(res3)
 ```
 

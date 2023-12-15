@@ -31,10 +31,10 @@ getDatasets <- function(onlyPE=FALSE){
 getMethods <- function(onlyTop=FALSE){
   if(onlyTop)
     return(c("chromVAR", "minaLisa.others", "monaLisa.zero", "StabSel", 
-             "msVIPER"))
+             "fastMLM"))
   return(c( "chromVAR", "monaLisa", "StabSel", "GSEA", "decoupleR", 
-            "VIPER", "VIPERb", "msVIPER", "msVIPERb",
-            "ulm", "ulmB", "ulmGC", "regreg", "regregR",
+            "VIPER", "VIPERb", "msVIPER", "msVIPERb", "fastMLM",
+            "ulm", "ulmB", "ulmGC", "regreg", "regregR", 
             "BaGFoot", "MBA", "ATACseqTFEA", "decoupleR>limma" ))
 }
 
@@ -777,6 +777,26 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
     saveRDS(regregRdf, "./runATAC_results/with_pvalues/regregR.rds")
     readouts$regregR <- regregRdf
   }
+  
+  if("fastMLM" %in% methods){
+    mlmres <- runFastMLM(counts, mb, design=design)
+    saveRDS(mlmres$raw, "./runATAC_results/raw/fastMLM_raw.rds")
+    saveRDS(mlmres$res, "./runATAC_results/with_pvalues/fastMLM.rds")
+
+    # for testing variants:    
+    # mlmres <- runFastMLM(counts, mb, design=design, intercept=TRUE)
+    # saveRDS(mlmres$raw, "./runATAC_results/raw/fastMLMb_raw.rds")
+    # saveRDS(mlmres$res, "./runATAC_results/with_pvalues/fastMLMb.rds")
+    # mlmres <- runFastMLM(counts, mb, design=design, intercept=FALSE)
+    # saveRDS(mlmres$raw, "./runATAC_results/raw/fastMLMbnoI_raw.rds")
+    # saveRDS(mlmres$res, "./runATAC_results/with_pvalues/fastMLMbnoI.rds")
+    # mlmres <- runFastMLM(counts, m, design=design, intercept=TRUE)
+    # saveRDS(mlmres$raw, "./runATAC_results/raw/fastMLM_raw.rds")
+    # saveRDS(mlmres$res, "./runATAC_results/with_pvalues/fastMLM.rds")
+    # mlmres <- runFastMLM(counts, m, design=design, intercept=FALSE)
+    # saveRDS(mlmres$raw, "./runATAC_results/raw/fastMLMnoI_raw.rds")
+    # saveRDS(mlmres$res, "./runATAC_results/with_pvalues/fastMLMnoI.rds")
+  }
 
   # run Model-based analysis
 
@@ -824,7 +844,7 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
 }
 
 
-runCVariants <- function(datasets){
+runCVariants <- function(datasets, limmaTrend=FALSE, ihw=FALSE){
   library(chromVAR)
   library(limma)
   for(dn in names(datasets)){
@@ -863,9 +883,18 @@ runCVariants <- function(datasets){
         fit1 <- lmFit(devMat, design)
         CVdf <- limma2df(eBayes(fit1))
         saveRDS(CVdf, file.path(dn, "runATAC_results", "with_pvalues", paste0(f, ".rds")))
-        # fit1$Amean <- rowMeans(abs(assay(dev)))
-        # CVdf <- limma2df(eBayes(fit1, trend=TRUE))
-        # saveRDS(CVdf, file.path(dn, "runATAC_results", "with_pvalues", paste0(f, "trend.rds")))
+        if(limmaTrend){
+          fit1$Amean <- rowMeans(abs(assay(dev)))
+          CVdf <- limma2df(eBayes(fit1, trend=TRUE))
+          saveRDS(CVdf, file.path(dn, "runATAC_results", "with_pvalues", paste0(f, "trend.rds")))
+        }
+        if(ihw){
+          library(IHW)
+          CVdf$meanAbsZ <- rowMeans(abs(assays(dev)$z))[row.names(CVdf)]
+          tmp <- ihw(CVdf$p, covariates=CVdf$meanAbsZ, alpha=0.05, nbins=5)
+          CVdf$padj <- adj_pvalues(tmp)
+          saveRDS(CVdf, file.path(dn, "runATAC_results", "with_pvalues", paste0(f, "ihw.rds")))
+        }
       }
       dev$condition <- factor(design)
       dd <- chromVAR::differentialDeviations(dev, "condition")

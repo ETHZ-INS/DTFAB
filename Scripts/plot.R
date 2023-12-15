@@ -211,7 +211,8 @@ renameMethods <- function(x, renaming=NULL){
     ulmB="ulm(binary)", ulm="ulm(scores)", MBA="insertionModel", GSEA="fGSEA",
     CVdev="chromVAR(deviations)>limma", CVdevCentered="chromVAR(deviations)>center>limma",
     CVdevNorm="chromVAR(deviations)>scale>limma", CVdevqt="chromVAR(deviations)>Qt>limma",
-    diffTF="diffTF(permutations)", diffTF_noPerm="diffTF(analytic)"
+    diffTF="diffTF(permutations)", diffTF_noPerm="diffTF(analytic)",
+    fastMLM="GCsmooth>fastMLM>limma"
   )
   for(i in names(renaming)) x <- replace(x, x==i, renaming[[i]])
   x <- gsub("decoupleR","decoupleR(",x,fixed=TRUE)

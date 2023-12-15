@@ -14,7 +14,7 @@ suppressPackageStartupMessages({
 source("../Scripts/plot.R")
 source("../Scripts/runMethods.R")
 res <- readRDS("../fullFrags/results.rds")
-res <- res[which(res$method!="Ridge-lm"),] # redundant with lasso...
+res <- res[which(!(res$method %in% c("Ridge-lm","GCsmooth>fastMLM>limma"),]
 ```
 
 ```{r, fig.width=9, fig.height=10}
