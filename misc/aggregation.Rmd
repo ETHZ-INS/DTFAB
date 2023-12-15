@@ -57,3 +57,40 @@ ggplot(bml2, aes(reorder(method,-sqrt(rank)), reorder(dataset, -sqrt(rank)), fil
   labs(x="", y="", fill="rank of \ntrue motif   ")
 ```
 
+# MLM+CV score aggregation
+
+```{r}
+cv <- readRDS("../fullFrags/BANP/runATAC_results/raw/CV_raw.rds")$obj1
+mlm <- readRDS("../GCnorm/BANP/runATAC_results/raw/decoupleRlimma_raw.rds")$res
+mlm <- mlm[which(mlm$statistic=="mlm"),]
+mlm <- reshape2::dcast(mlm, source~condition, value.var="score")
+row.names(mlm) <- mlm[,1]
+mlm <- as.matrix(mlm[,-1])
+
+ints <- readRDS("../Scripts/allInteractors.rds")
+ds <- getDatasets()
+res <- lapply(setNames(names(ds),names(ds)), FUN=function(x){
+  cv <- readRDS(paste0("../fullFrags/",x,"/runATAC_results/raw/CV_raw.rds"))$obj1
+  mlm <- readRDS(paste0("../GCnorm/",x,"/runATAC_results/raw/decoupleRlimma_raw.rds"))$res
+  mlm <- mlm[which(mlm$statistic=="mlm"),]
+  mlm <- reshape2::dcast(mlm, source~condition, value.var="score")
+  row.names(mlm) <- mlm[,1]
+  mlm <- as.matrix(mlm[,-1])
+  m <- t(t(scale(mlm))+t(scale(assays(cv)$z)))
+  design <- rep(LETTERS[1:2], each=ncol(m)/2)
+  fit <- eBayes(lmFit(m, model.matrix(~design)))
+  res <- topTable(fit, number=Inf)
+  res <- data.frame(row.names=row.names(res), logFC=res$logFC, t=res$t,
+                    p=res$P.Value, padj=res$adj.P.Val)
+  res <- res[order(res$p, -abs(res$logFC)),]
+  res$rank <- seq_len(nrow(res))
+
+  bm <- .getBenchmarkMetrics(res, ds[[x]]$truth, interactors = ints)
+  list(res=res, bm=bm)
+})
+
+bm <- dplyr::bind_rows(lapply(res, FUN=function(x) x$bm), .id="dataset")
+bm$method <- "(chromVAR+MLM)>limma"
+saveRDS(bm, "MLM_CV.rds")
+```
+

@@ -393,14 +393,18 @@ plot_grid(h, scale=0.95)
 
 # `r getFigNb(TRUE)`
 
-```{r, fig.width=5, fig.height=7}
+```{r, fig.width=5, fig.height=7.5}
 bml2 <- readRDS("../misc/aggregated.bm.rds")
-bml2$method <- gsub("ML","monaLisa",bml2$method)
+bml2b <- readRDS("../misc/MLM_CV.rds")
+bml2b$type <- "aggregation methods"
+bml2 <- rbind(bml2,bml2b)
+bml2$method <- gsub("GCnorm:decoupleRlimmamlm","GCnorm>MLM>limma", bml2$method, fixed=TRUE)
+bml2$method <- gsub("^ML$","monaLisa",bml2$method)
 bml2$method <- gsub("CVqt","chromVAR",bml2$method)
 bml2$trueQ[is.na(bml2$trueQ)] <- 1
 rankBreaks=c(1,6,20,50,100,200,400)
-p1 <- ggplot(bml2, aes(reorder(method,-sqrt(rank)), reorder(dataset, -sqrt(rank)), fill=sqrt(rank), label=rank)) + geom_tile() + 
-  facet_wrap(~type, scales="free_x") + geom_text() + theme_minimal() +
+p1 <- ggplot(bml2, aes(reorder(method,-sqrt(rank)), reorder(dataset, -sqrt(rank)), fill=sqrt(rank), label=rank)) +
+  geom_tile() + facet_wrap(~type, scales="free_x") + geom_text(size=3) + theme_minimal() +
   theme(panel.grid = element_blank(),
             axis.text.x=element_text(angle=45, hjust=1, vjust=1)) +
   scale_fill_viridis_c(direction=-1, breaks=sqrt(rankBreaks), 
