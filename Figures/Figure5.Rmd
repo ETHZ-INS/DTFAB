@@ -22,11 +22,13 @@ cv$absMaxDeviation <- matrixStats::rowMaxs(abs(assays(dev)$deviations))
 cv$absMaxZ <- matrixStats::rowMaxs(abs(assays(dev)$z))
 cv <- cv[order(cv$P.Value),]
 # label motifs with decent abs(dev), large logFC and smallish adj.p...
-cv2 <- cv[which(abs(cv$logFC)>4.8 & cv$adj.P.Val<0.2 & cv$absMaxDeviation>0.0122),]
+#cv2 <- cv[which(abs(cv$logFC)>4.8 & cv$adj.P.Val<0.2 & cv$absMaxDeviation>0.0122),]
+cv2 <- cv[which(abs(cv$logFC)>3.8 & cv$adj.P.Val<0.2 & cv$absMaxDeviation>0.005),]
 p1 <- ggplot(cv, aes(absMaxDeviation, logFC, colour=-log10(adj.P.Val), label=TF)) +
   geom_point() + scale_color_viridis_c(option="rocket",direction=-1) + theme_bw() +
   geom_point(data=cv[grep("NFKB",row.names(cv)),], size=5, shape=1, alpha=1, colour="darkred") +
-  ggrepel::geom_text_repel(data=cv2, min.segment.length=0, max.overlaps=30, show.legend=FALSE) +
+  ggrepel::geom_text_repel(data=cv2, min.segment.length=0, max.overlaps=30, show.legend=FALSE,
+                           nudge_y=sign(cv2$logFC)+2*cv2$absMaxDeviation>0.025, size=3) +
   labs(x="Maximum absolute chromVAR deviation", y="Motif log2(foldchange) with TRAFTAC") +
   theme(legend.position = "bottom")
 ```
@@ -35,6 +37,7 @@ p1 <- ggplot(cv, aes(absMaxDeviation, logFC, colour=-log10(adj.P.Val), label=TF)
 ```{r}
 mlse <- readRDS("../TRAFTAC/monaLisa.GCsmoothQ.SE.rds")
 cv$ml.p <- rowData(mlse)[row.names(cv),"simes.p"]
+cv$ml.q <- rowData(mlse)[row.names(cv),"simes.padj"]
 wNoZ <- which(!mlse$bin.nochange)
 mlp <- (1-10^-assay(mlse,"negLog10P")[,wNoZ])
 cv$ml.enr <- rowSums(assay(mlse,"log2enr")[,wNoZ])/rowSums(mlp)
@@ -43,9 +46,16 @@ cv$TF <- row.names(cv)
 w <- which( (-log10(cv$ml.p) + -log10(cv$P.Value))>4)
 p2 <- ggplot(cv, aes(-log10(P.Value), -log10(ml.p), colour=abs(logFC), label=TF)) + 
   geom_point() + scale_colour_viridis_c(option="rocket", direction=-1) + theme_bw() + 
-  ggrepel::geom_text_repel(data=cv[w,]) + theme(legend.position = "bottom") +
+  ggrepel::geom_text_repel(data=cv[w,], size=3) + theme(legend.position = "bottom") +
   labs(x="chromVAR -log10(p-value)", y="monaLisa -log10(p-value)", colour="chromVAR abs(logFC)")
 ```
+
+```{r}
+mlm <- readRDS("../TRAFTAC/gcnorm.mlm.SE.rds")
+metadata(mlm) <- metadata(dev)
+mlm.sig <- row.names(mlm)[rowData(mlm)$adj.P.Val<0.05]
+```
+
 
 ```{r, fig.height=5, fig.width=8}
 selected <- readRDS("../TRAFTAC/stabSel.selected.rds")
@@ -58,22 +68,57 @@ hl <- plotMotifHeatmaps(x = mlse[uMo,],
                   width = 1.25, cluster = TRUE, doPlot=FALSE,
                   column_title_gp=gpar(fontsize=11),
                   show_motif_GC = FALSE, show_seqlogo = TRUE)
-hl[[4]] <- sechm(dev, uMo, assayName = "z", do.scale=TRUE, 
+hl[[3]] <- sechm(dev, uMo, assayName = "z", do.scale=TRUE, 
                        column_title_gp=gpar(fontsize=11), column_title="chromVAR",
                        width=unit(0.7, "in"), row_names_gp=gpar(fontsize=10))
-p3 <- grid.grabExpr(draw(Reduce("+",hl), merge=TRUE))
+hl[[4]] <- sechm(mlm, uMo, assayName = "lm", do.scale=TRUE, name="MLM\nz-score", 
+                       column_title_gp=gpar(fontsize=11), column_title="mlm",
+                       width=unit(0.7, "in"), row_names_gp=gpar(fontsize=10))
+p3 <- grid.grabExpr(draw(Reduce("+",hl), merge=TRUE), wrap.grobs=TRUE)
 ```
 
 
 ```{r, fig.height=9, fig.width=9}
-# why do suddenly half of the motifs disappear???
 pp <- plot_grid(
   plot_grid(p1,p2,nrow=1,labels="AUTO",scale=0.95),
   p3, 
   nrow=2, rel_heights=c(4,5.5), labels=c(NA,"C")
 )
 pp
-pdf("Figure5.pdf", height=8.5, width=8.5)
+```
+
+Showing only the interesting TFs to discuss:
+
+```{r, fig.height=3.5, fig.width=7}
+tfs <- list(consistent=c("GLIS2","NFE2","FOSL1"), inconsistent=c("NFYA","NFKB1","JUNB","FOS"))
+rsplit <- data.frame(row.names=unlist(tfs), row_split=rep(names(tfs),lengths(tfs)))
+hl <- plotMotifHeatmaps(x = mlse[unlist(tfs),],
+                  which.plots = c("log2enr","negLog10P","pearsonResid"), width.seqlogo=1.6,
+                  width = 1.3, cluster = FALSE, doPlot=FALSE,
+                  column_title_gp=gpar(fontsize=11), row_title_gp=gpar(fontsize=9),
+                  show_motif_GC = FALSE, show_seqlogo = TRUE)
+hl$labels@row_names_param$show <- FALSE
+hl$labels@matrix_param$row_split <- rsplit
+hl$log2enr@matrix_param$row_split <- rsplit
+hl[[2]]@column_title[1] <- "monaLisa\nlog2(enrichment)"
+hl[[3]] <- sechm(dev, tfs, assayName = "z", do.scale=TRUE, 
+                       column_title_gp=gpar(fontsize=11), column_title="chromVAR", name="chromVAR\nz-score",
+                       width=unit(0.7, "in"), row_names_gp=gpar(fontsize=10), isMult=TRUE)
+hl[[4]] <- sechm(mlm, tfs, assayName = "lm", do.scale=TRUE, name="z-score", 
+                       column_title_gp=gpar(fontsize=11), column_title="MLM",
+                       width=unit(0.7, "in"), row_names_gp=gpar(fontsize=10))
+p3b <- grid.grabExpr(draw(Reduce("+",hl), merge=FALSE), wrap.grobs=TRUE)
+```
+
+
+```{r, fig.height=7, fig.width=8.5}
+pp <- plot_grid(
+  plot_grid(p1,p2,nrow=1,labels="AUTO",scale=0.95),
+  p3b,
+  nrow=2, rel_heights=c(5,4), labels=c(NA,"C")
+)
+pp
+pdf("Figure5.pdf", height=7, width=8.5)
 pp
 dev.off()
 ```
