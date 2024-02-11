@@ -99,7 +99,10 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
                        forceRerun=FALSE, outSubfolder="runATAC_results",
                        readlist=NULL, DA.norm="TMM"){
   
-  methods <- match.arg(methods, several.ok = TRUE)
+  methods <- match.arg(methods, 
+                       several.ok=TRUE, 
+                       choices=union(getMethods(),
+                                     getMethods(onlyTop=TRUE)))
   
   suppressPackageStartupMessages({
     library(viper)

@@ -1,0 +1,218 @@
+---
+title: "02_pos_control"
+author: "Emanuel Sonder"
+date: "06 11 2023"
+output: html_document
+---
+
+```{r setup}
+library(Rsamtools)
+library(BiocParallel)
+library(GenomicAlignments)
+library(regioneR)
+library(BSgenome.Hsapiens.UCSC.hg38)
+library(MASS)
+library(mclust)
+library(Repitools)
+library(data.table)
+
+data.table::setDTthreads(2)
+source("./scripts/atacSignalSimulation.R")
+source("../Scripts/runMethods.R")
+source("../Scripts/compileBenchmark.R")
+source("../Scripts/getpmoi.R")
+```
+
+```{r, genome}
+genome <- BSgenome.Hsapiens.UCSC.hg38
+```
+
+```{r, subset peaks, eval=FALSE}
+peakDirs <- c("./data/ChIP_peaks/ENCFF500EWB_ZNF143.bed.gz", 
+              "./data/ChIP_peaks/ENCFF250FJC_MAZ.bed.gz",
+              "./data/ChIP_peaks/ENCFF156OCY_CEBPB.bed.gz",
+              "./data/ChIP_peaks/ENCFF592UDD_CTCF.bed.gz")
+
+lapply(peakDirs, function(dir){
+  tf <- unlist(tstrsplit(unlist(tstrsplit(dir, split="_", keep=3)), split=".", fixed=TRUE, keep=1))
+  peaks <- fread(dir, col.names=c("chr","start", "end",
+                                  "name", "score", "strand",
+                                  "signalValue", "pValue",
+                                  "qValue", "peak"))
+  peakRanges <- makeGRangesFromDataFrame(as.data.frame(peaks))
+  # Subset chIP peaks to only motif containing ones: 
+  motifs <- fixMotifs(getNonRedundantMotifs("universal", spec="Hsapiens"), 
+                    spec="Hsapiens", "../Scripts")
+  mypath <- function(x, folder=".") paste0(folder,"/",x)
+  universalmotif::write_meme(motifs, file.path("./data/ChIP_peaks", "motifs.meme"), overwrite=TRUE)
+  pmoi <- getpmoi(genome=genome, peaks=peakRanges, spec="Hsapiens",
+                seqStyle="UCSC", srcFolder="../Scripts")
+  pmoiDt <- as.data.table(pmoi)
+  
+  if(tf=="ZNF143")
+  {
+    tf <- "ZN143"
+  }
+  
+  pmoiDt <- subset(pmoi, motif_id==tf)
+  pmoiSub <- makeGRangesFromDataFrame(as.data.frame(pmoiDt))
+  peaks <- peaks[overlapsAny(peakRanges,pmoiSub),]
+
+  write.table(peaks,
+              file.path("./data/ChIP_peaks",paste0("motif_", tf, ".bed")),
+              quote=FALSE, col.names=FALSE,
+              sep="\t",
+              row.names=FALSE)
+  
+})
+```
+
+```{r, paths}
+outDir <- "./data/sim_data_pos_control"
+bedBaseDir <- "./data/ATAC_beds"
+atacPeaksPath <- "./data/peaks/merged_peaks.narrowPeak"
+haploPath <- "./data/haploinsufficiency.rds"
+actPath <- "./data/activation.rds"
+
+# Baseline samples 
+bedPaths <- paste(bedBaseDir, c("ENCFF495DQP.rds", "ENCFF130DND.rds", 
+                                "ENCFF447ZRG.rds", "ENCFF966ELR.rds",
+                                "ENCFF358GWK.rds", "ENCFF963YZH.rds"), sep="/")
+
+# ChIP-peaks
+znf143PeaksDir <- "./data/ChIP_peaks/motif_ZN143.bed"
+mazPeaksDir <- "./data/ChIP_peaks/motif_MAZ.bed"
+cebpbPeaksDir <- "./data/ChIP_peaks/motif_CEBPB.bed"
+ctcfPeaksDir <- "./data/ChIP_peaks/motif_CTCF.bed"
+```
+
+# Simulate 
+
+Define simulation parameters
+```{r, simulation parameters}
+simParams <- as.data.table(expand.grid(es=c(0, 0.25, 0.5, 1, 3),
+                                       tf=c("ZNF143", "MAZ", "CEBPB", "CTCF"),
+                                       paradigm=c("activation", 
+                                                  "haploinsufficiency")))
+
+simParams[,vary_atac_peaks:=FALSE]
+simParams[,peaks_path:=fifelse(tf=="ZNF143", znf143PeaksDir, "")]
+simParams[,peaks_path:=fifelse(tf=="MAZ", mazPeaksDir, peaks_path)]
+simParams[,peaks_path:=fifelse(tf=="CEBPB", cebpbPeaksDir, peaks_path)]
+simParams[,peaks_path:=fifelse(tf=="CTCF", ctcfPeaksDir, peaks_path)]
+
+simParams[,paradigm_path:=fifelse(paradigm=="activation", actPath, haploPath)]
+
+# Fixed parameters
+sampleNames <- c("group1_1", "group1_2", "group1_3",
+                 "group2_1", "group2_2", "group2_3")
+design <- c(1,1,1,-1,-1,-1)
+genome <- BSgenome.Hsapiens.UCSC.hg38
+which <- GRanges(Rle(paste0("chr", 1:22)), IRanges(start=1, width=536870912))
+
+
+# here FLD & GC parameters will be the same across groups 
+paramsGroup1 <- paramsGroup2 <- data.table()
+paramsGroup1$name <- "group1"
+paramsGroup2$name <- "group2"
+```
+
+Simulate
+```{r, simulate, eval=FALSE}
+# run sequentially 
+lapply(1:nrow(simParams), function(i){
+
+  lfcDist <- readRDS(simParams[i,]$paradigm_path)
+  simData <- simAtacData(bamPaths=bedPaths,
+                          chIPPeakDir=simParams[i,]$peaks_path,
+                          atacPeakDir=atacPeaksPath,
+                          sampleNames=sampleNames,
+                          effectStrength=simParams[i,]$es,
+                          gcBiases=NULL,
+                          fracSub=1,
+                          design=design,
+                          paramsGroup1=paramsGroup1,
+                          paramsGroup2=paramsGroup2,
+                          lfcDist=lfcDist,
+                          which=which,
+                          genome=genome,
+                          simGCBias=FALSE,
+                          simFLD=FALSE,
+                          varyAtacPeaks=simParams[i,]$vary_atac_peaks,
+                          colNamesChIPPeaks=c("chr","start", "end",
+                                              "name", "score", "strand",
+                                             "signalValue", "pValue",
+                                             "qValue", "peak"),
+                         colNamesAtacPeaks=c("chr","start", "end",
+                                             "name", "score", "strand",
+                                             "signalValue", "pValue",
+                                             "qValue", "peak"),
+                         enrColChIPName="signalValue",
+                         enrColAtacName="signalValue",
+                         lfcCol="lfc",
+                         annotationStyle="UCSC",
+                         maxReadPerPeak=1e6,
+                         equalLib=FALSE,
+                         seed=42)
+  
+  folderName <- paste(simParams[i,]$tf, simParams[i,]$paradigm, 
+                      simParams[i,]$es, simParams[i,]$vary_atac_peaks, sep="_")
+  folderName <- paste(folderName, "seq_files", sep="/")
+  saveToBed(simData, outDir, folderName, saveMerged=FALSE)
+  
+  wd <- getwd()
+  setwd(file.path(outDir, folderName))
+  mergeBedsCommand <- "cat -u group1_1.bed group1_2.bed group1_3.bed > group1_merged.bed"
+  system(mergeBedsCommand)
+  mergeBedsCommand <- "cat -u group2_1.bed group2_2.bed group2_3.bed > group2_merged.bed"
+  system(mergeBedsCommand)
+  
+  callPeaksCommand <- "nice -n 3 macs2 callpeak --outdir ../peaks -f BEDPE -n group1 -t group1_merged.bed"
+  system(callPeaksCommand)
+  
+  callPeaksCommand <- "nice -n 3 macs2 callpeak --outdir ../peaks -f BEDPE -n group2 -t group2_merged.bed"
+  system(callPeaksCommand)
+  
+  file.remove("group1_merged.bed")
+  file.remove("group2_merged.bed")
+  
+  # merge peaks 
+  #dir.create("../peaks")
+  mergePeaksCommand <- "cat ../peaks/*narrowPeak | cut -f1-3 | sort -k1,1 -k2,2n | bedtools merge -i - > ../peaks/merged_peaks.bed"
+  system(mergePeaksCommand)
+  
+  setwd(wd)
+  gc()
+})
+```
+
+# Benchmark 
+
+Run methods
+```{r, run methods, eval=TRUE}
+simParams[,folderName:=paste(tf, paradigm, es, vary_atac_peaks, sep="_")]
+subSimParams <- simParams
+
+datasets <- lapply(1:nrow(subSimParams), function(i){
+  ds <- list(truth=subSimParams[i,]$tf,
+             species="h", 
+             type="sim",
+             seqStyle="UCSC",
+             peakFile="./peaks/merged_peaks.bed",
+             folder=paste0("./data/sim_data_pos_control/", subSimParams[i,]$folderName),
+             readType="bed")
+  return(ds)
+})
+names(datasets) <- subSimParams$folderName
+
+runAll(datasets, scriptsFolder="../../../../Scripts", 
+       methods=getMethods(onlyTop = TRUE), forceRerun=TRUE)
+```
+
+# Sessioninfo 
+
+```{r}
+print(sessionInfo())
+```
+
+

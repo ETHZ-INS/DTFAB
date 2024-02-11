@@ -1,0 +1,255 @@
+---
+title: "01_effect_strength"
+author: "Emanuel Sonder"
+date: "06 11 2023"
+output: html_document
+---
+
+```{r setup}
+library(ggplot2)
+library(cowplot)
+library(ComplexHeatmap)
+library(data.table)
+library(SummarizedExperiment)
+library(patchwork)
+library(RColorBrewer)
+library(ggpointdensity)
+library(viridis)
+library(ggrepel)
+library(patchwork)
+library(limma)
+library(ggh4x)
+library(ggpubr)
+
+source("../Scripts/plot.R")
+source("../Scripts/runMethods.R")
+source("../Scripts/getpmoi.R")
+cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+```
+
+Import counts
+```{r, import peaks, eval=TRUE}
+rawFiles <- list.files("./data/sim_data_es", recursive=TRUE, full.names=TRUE)
+rawFiles <- rawFiles[grepl("countmatrix.rds", rawFiles)]
+
+rawFiles <- rawFiles[!grepl("_0_", rawFiles)]
+rawFilesBaseline <- list.files("./data/data_baseline", recursive=TRUE, full.names=TRUE)
+rawFilesBaseline <- rawFilesBaseline[grepl("countmatrix.rds", rawFilesBaseline)]
+
+peakZNF143Ranges <- fread("./data/ChIP_peaks/ENCFF500EWB_ZNF143.bed.gz", 
+                    select=1:3, col.names=c("chr", "start", "end"))
+peakZNF143Ranges <- makeGRangesFromDataFrame(as.data.frame(peakZNF143Ranges))
+peakMAZRanges <- fread("./data/ChIP_peaks/ENCFF250FJC_MAZ.bed.gz", 
+                    select=1:3, col.names=c("chr", "start", "end"))
+peakMAZRanges <- makeGRangesFromDataFrame(as.data.frame(peakMAZRanges))
+peakCEBPBRanges <- fread("./data/ChIP_peaks/ENCFF156OCY_CEBPB.bed.gz", 
+                    select=1:3, col.names=c("chr", "start", "end"))
+peakCEBPBRanges <- makeGRangesFromDataFrame(as.data.frame(peakCEBPBRanges))
+peakCTCFRanges <- fread("./data/ChIP_peaks/ENCFF592UDD_CTCF.bed.gz", 
+                    select=1:3, col.names=c("chr", "start", "end"))
+peakCTCFRanges <- makeGRangesFromDataFrame(as.data.frame(peakCTCFRanges))
+```
+
+```{r, import counts}
+countMats <- lapply(rawFiles, function(file){
+  se <- readRDS(file)
+  cm <- as.data.table(as.matrix(assays(se)$counts))
+  if(grepl("ZNF143", file)){
+    ovChip <- overlapsAny(rowRanges(se), peakZNF143Ranges)
+    ovChip <- fifelse(ovChip, "overlaps ChIP", "no overlap")
+    
+    motifRanges <- readRDS(file.path(dirname(file), "pmoi.rds"))
+    motifRanges <- motifRanges[motifRanges$motif_id=="ZN143"]
+    
+    ovMotif <- overlapsAny(rowRanges(se), motifRanges)
+    ovMotif <- fifelse(ovMotif, "overlaps motif", "no overlap")
+  }
+  else if(grepl("CEBPB", file)){
+    ovChip <- overlapsAny(rowRanges(se), peakCEBPBRanges)
+    ovChip <- fifelse(ovChip, "overlaps ChIP", "no overlap")
+    
+    motifRanges <- readRDS(file.path(dirname(file), "pmoi.rds"))
+    motifRanges <- motifRanges[motifRanges$motif_id=="CEBPB"]
+    
+    ovMotif <- overlapsAny(rowRanges(se), motifRanges)
+    ovMotif <- fifelse(ovMotif, "overlaps motif", "no overlap")
+  }
+  else if(grepl("MAZ", file)){
+    ovChip <- overlapsAny(rowRanges(se), peakMAZRanges)
+    ovChip <- fifelse(ovChip, "overlaps ChIP", "no overlap")
+    
+    motifRanges <- readRDS(file.path(dirname(file), "pmoi.rds"))
+    motifRanges <- motifRanges[motifRanges$motif_id=="MAZ"]
+    
+    ovMotif <- overlapsAny(rowRanges(se), motifRanges)
+    ovMotif <- fifelse(ovMotif, "overlaps motif", "no overlap")
+   }
+  else if(grepl("CTCF", file)){
+    ovChip <- overlapsAny(rowRanges(se), peakCTCFRanges)
+    ovChip <- fifelse(ovChip, "overlaps ChIP", "no overlap")
+    
+    motifRanges <- readRDS(file.path(dirname(file), "pmoi.rds"))
+    motifRanges <- motifRanges[motifRanges$motif_id=="CTCF"]
+    
+    ovMotif <- overlapsAny(rowRanges(se), motifRanges)
+    ovMotif <- fifelse(ovMotif, "overlaps motif", "no overlap")
+  }
+
+  cm$peak_id <- 1:nrow(cm)
+  cm$overlaps_chip <- ovChip
+  cm$overlaps_motif <- ovMotif
+  
+  cm <- suppressWarnings(melt(cm, id.vars=c("peak_id", 
+                                            "overlaps_chip", 
+                                            "overlaps_motif")))
+  cm$setting <- unlist(tstrsplit(file, keep=4, split="/"))
+  cm[,c("tf", "paradigm", "es", "varied_atac"):=tstrsplit(setting, split="_")]
+  cm$setting <- NULL
+  cm})
+
+countMats <- rbindlist(countMats)
+setnames(countMats, c("variable", "value"), c("sample", "count"))
+countMats[,group:=tstrsplit(sample, split="_", keep=1)]
+countMats[,sample:=tstrsplit(sample, split=".", keep=1, fixed=TRUE)]
+
+# Read raw baseline files
+countMatsBaseline <- lapply(c("CEBPB", "CTCF", "MAZ", "ZNF143"), function(tf){
+  
+  se <- readRDS(rawFilesBaseline)
+  cm <- as.data.table(as.matrix(assays(se)$counts))
+  
+  if(tf=="ZNF143"){
+    ovChip <- overlapsAny(rowRanges(se), peakZNF143Ranges)
+    ovChip <- fifelse(ovChip, "overlaps ChIP", "no overlap")
+    
+    motifRanges <- readRDS(file.path(dirname(rawFilesBaseline), "pmoi.rds"))
+    motifRanges <- motifRanges[motifRanges$motif_id=="ZN143"]
+    
+    ovMotif <- overlapsAny(rowRanges(se), motifRanges)
+    ovMotif <- fifelse(ovMotif, "overlaps motif", "no overlap")
+  }
+  else if(tf=="CEBPB"){
+    ovChip <- overlapsAny(rowRanges(se), peakCEBPBRanges)
+    ovChip <- fifelse(ovChip, "overlaps ChIP", "no overlap")
+    
+    motifRanges <- readRDS(file.path(dirname(rawFilesBaseline), "pmoi.rds"))
+    motifRanges <- motifRanges[motifRanges$motif_id=="CEBPB"]
+    
+    ovMotif <- overlapsAny(rowRanges(se), motifRanges)
+    ovMotif <- fifelse(ovMotif, "overlaps motif", "no overlap")
+  }
+  else if(tf=="MAZ"){
+    ovChip <- overlapsAny(rowRanges(se), peakMAZRanges)
+    ovChip <- fifelse(ovChip, "overlaps ChIP", "no overlap")
+    
+    motifRanges <- readRDS(file.path(dirname(rawFilesBaseline), "pmoi.rds"))
+    motifRanges <- motifRanges[motifRanges$motif_id=="MAZ"]
+    
+    ovMotif <- overlapsAny(rowRanges(se), motifRanges)
+    ovMotif <- fifelse(ovMotif, "overlaps motif", "no overlap")
+   }
+  else if(tf=="CTCF"){
+    ovChip <- overlapsAny(rowRanges(se), peakCTCFRanges)
+    ovChip <- fifelse(ovChip, "overlaps ChIP", "no overlap")
+    
+    motifRanges <- readRDS(file.path(dirname(rawFilesBaseline), "pmoi.rds"))
+    motifRanges <- motifRanges[motifRanges$motif_id=="CTCF"]
+    
+    ovMotif <- overlapsAny(rowRanges(se), motifRanges)
+    ovMotif <- fifelse(ovMotif, "overlaps motif", "no overlap")
+  }
+
+  cm$peak_id <- 1:nrow(cm)
+  cm$overlaps_chip <- ovChip
+  cm$overlaps_motif <- ovMotif
+  
+  cm <- suppressWarnings(melt(cm, id.vars=c("peak_id", 
+                                            "overlaps_chip", 
+                                            "overlaps_motif")))
+  cm$tf <- tf
+  cm$es <- 0
+  cm$varied_atac <- FALSE
+  cm
+})
+
+
+countMatsBaseline <- rbindlist(countMatsBaseline)
+setnames(countMatsBaseline, c("variable", "value"), c("sample", "count"))
+countMatsBaseline[,sample:=tstrsplit(sample, split=".", keep=1, fixed=TRUE)]
+countMatsBaseline[,group:=fifelse(grepl("CTRL", sample), "group1", "group2")]
+
+cmb1 <- copy(countMatsBaseline)
+cmb2 <- copy(countMatsBaseline)
+cmb1$paradigm <- "haploinsufficiency"
+cmb2$paradigm <- "activation"
+
+countMatsBaseline <- rbind(cmb1, cmb2)
+countMats <- rbind(countMats, countMatsBaseline, use.names=TRUE, fill=TRUE)
+
+# rename baseline sample names
+countMats[,sample:=fifelse(sample=="CTRL1", "group1_1", sample)]
+countMats[,sample:=fifelse(sample=="CTRL2", "group1_2", sample)]
+countMats[,sample:=fifelse(sample=="CTRL3", "group1_3", sample)]
+countMats[,sample:=fifelse(sample=="TRT1", "group2_1", sample)]
+countMats[,sample:=fifelse(sample=="TRT2", "group2_2", sample)]
+countMats[,sample:=fifelse(sample=="TRT3", "group2_3", sample)]
+
+saveRDS(countMats, "countMats.rds")
+```
+
+Get count matrix with motif information of all
+```{r, motif frequencies simulated}
+# subset to: es 1 & 3 
+rawFiles <-  rawFiles[grepl("1", rawFiles)  & !grepl("0", rawFiles) & !grepl("_3_", rawFiles)]
+
+freqAll <- lapply(rawFiles, function(file){
+  se <- readRDS(file)
+  cm <- as.data.table(as.matrix(assays(se)$counts))
+  
+  if(grepl("ZNF143", file)) peakRanges <- peakZNF143Ranges
+  if(grepl("CTCF", file)) peakRanges <- peakCTCFRanges
+  if(grepl("MAZ", file)) peakRanges <- peakMAZRanges
+  if(grepl("CEBPB", file)) peakRanges <- peakCEBPBRanges
+
+  ovChip <- overlapsAny(rowRanges(se), peakRanges)
+  ovChip <- fifelse(ovChip, "overlaps ChIP", "no overlap")
+
+  cm$peak_id <- 1:nrow(cm)
+  cm$overlaps_chip <- ovChip
+  
+  motifRanges <- readRDS(file.path(dirname(file), "pmoi.rds"))
+  motifDt <- as.data.table(motifRanges)
+  motifDt$overlaps_chip_motif <- overlapsAny(motifRanges, peakRanges)
+    
+  hits <- findOverlaps(rowRanges(se), motifRanges, select="all")
+  cmAll <- cbind(cm[queryHits(hits),c("overlaps_chip", "peak_id"), with=FALSE],
+                 motifDt[subjectHits(hits), c("overlaps_chip_motif", "motif_id")])
+  
+  cmAll$setting <- unlist(tstrsplit(file, keep=4, split="/"))
+  cmAll[,c("tf", "paradigm", "es", "varied_atac"):=tstrsplit(setting, split="_")]
+  cmAll$setting <- NULL
+  cmAll[,overlaps_chip_motif:=sum(overlaps_chip_motif)>0, by=.(peak_id, motif_id)]
+  cmAll[,tf:=fifelse(tf=="ZNF143", "ZN143", tf)]
+  
+  cmAll[,cont_tf:=sum(motif_id==tf)>0, by=.(peak_id)]
+  cmAll <- unique(cmAll, by=c("peak_id", "motif_id"))  
+  
+  cmAll[,n_co_peak_chip:=sum(cont_tf & overlaps_chip_motif), by=.(motif_id)]
+  cmAll[,n_co_peak:=sum(cont_tf), by=.(motif_id)]
+  
+  freqDt <- cmAll[,.(n_chIP_motif=sum(overlaps_chip_motif), #sum(overlaps_chip=="overlaps ChIP")
+                     n_atac_only_motif=sum(!overlaps_chip_motif), #sum(overlaps_chip=="no overlap")
+                     n_atac_motif_total=.N,
+                     n_co_peak_chip=unique(n_co_peak_chip),
+                     n_co_peak=unique(n_co_peak)), 
+                  by=.(tf, motif_id, paradigm, es)]
+  
+  freqDt$tot_chIP <- sum(ovChip=="overlaps ChIP")
+  freqDt$tot_atac <- length(rowRanges(se))
+
+  freqDt
+  })
+
+freqAll <- rbindlist(freqAll)
+saveRDS(freqAll, "freqAll.rds")  
+```
