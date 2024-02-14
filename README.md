@@ -1,18 +1,22 @@
 # Benchmark of Differential TF activity methods
 
+This repository contains the code used in Gerbaldo, Sonder et al., for the benchmark of differential TF activity methods based on ATAC-seq data.
+
 ## Repository structure
 
-Wrappers and higher-level functions are located in the `Scripts` folder.
-Figures and downstream analyses are in the `Figures` folder.
+* **fullFrags**: benchmark on real datasets, using all fragments.
+* **nucFree**: benchmark on real datasets, using only nucleosome-free fragments.
+* **fullOnNucFreePeaks**: benchmark on real datasets, using counts of all fragments on nucleosome-free peaks.
+* **Scripts**: wrappers and higher-level functions.
+* **Figures**: code behind the paper's figures.
+* **simulations**: code for the generation of the semi-simulated datasets, and the benchmarks performed on those.
+* **singleCell**: code for the cell-level analysis.
+* **misc**: misc scripts preparing data objects for other analyses/plotting.
+* **TRAFTAC**: code for the analysis of the TRAFTAC dataset.
 
-The following folders each represent a benchmark processed separately:
+## Main benchmark folders
 
-* **fullFrags**: benchmark on real datasets, using all fragments
-* **nucFree**: benchmark on real datasets, using only nucleosome-free fragments
-* **fullOnNucFreePeaks**: benchmark on real datasets, using counts of all fragments on nucleosome-free peaks
-* **simulations**: benchmark on semi-simulated datasets
-
-Each of these folders contains one folder per dataset, with a `peaks` and a `seq_files` subfolders 
+Each of the 3 main benchmark folders contains one folder per dataset, with a `peaks` and a `seq_files` subfolders 
 containing, respectively, the merged peaks and the (aligned) reads/fragments.
 Due to size limitations the reads are not included in the repository, but are available on request.
 
