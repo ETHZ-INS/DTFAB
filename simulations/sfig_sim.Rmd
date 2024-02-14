@@ -1,0 +1,1173 @@
+
+```{r packages2}
+suppressPackageStartupMessages({
+  library(ggplot2)
+  library(cowplot)
+  library(ComplexHeatmap)
+  library(data.table)
+  library(SummarizedExperiment)
+  library(patchwork)
+  library(RColorBrewer)
+  library(ggpointdensity)
+  library(viridis)
+  library(ggrepel)
+  library(patchwork)
+  library(limma)
+  library(ggh4x)
+  library(ggpubr)
+  library(ggimage)
+  library(stringr)
+  library(BSgenome.Hsapiens.UCSC.hg38)
+  library(png)
+})
+BSgenome <- BSgenome.Hsapiens.UCSC.hg38
+
+source("../Scripts/plot.R")
+source("../Scripts/runMethods.R")
+source("../Scripts/compileBenchmark.R")
+source("../Scripts/getpmoi.R")
+cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", 
+                "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+```
+
+
+# `r getFigNb(TRUE)`
+
+```{r, fig.width=20, fig.height=14}
+plot_grid(
+  ggdraw() + draw_image("Sfig_sim_overview.png")
+)
+```
+
+
+**`r getFigNb()` : Overview of the simulations. **
+6 baseline ATAC-seq lymphoblastoid cell lines (LCLs) are divided into two groups (**B**).
+ChIP-seq peaks of the factor of interest (in LCLs) are used to identify regions of the
+accessibility profile in which differences will be introduced through downsampling of
+the fragments in one of the groups (**A**). The extent of downsampling is based on the 
+enrichment over the input of the ChIP peak, following one of two differential activity
+scenarios: an activation and a haploinsufficiency (see following supplementary figure).
+The magnitude of the effect is further scaled up and down, and eventual per-sample GC
+and fragment length biases are introduced (**C**).
+
+\newpage
+
+# `r getFigNb(TRUE)`
+
+
+```{r, echo=FALSE}
+# Motif proportion in ChIP peaks
+peakZNF143Ranges <- fread("./data/ChIP_peaks/ENCFF500EWB_ZNF143.bed.gz")
+peakZNF143MotifRanges <- fread("./data/ChIP_peaks/motif_ZN143.bed")
+
+peakMAZRanges <- fread("./data/ChIP_peaks/ENCFF250FJC_MAZ.bed.gz")
+peakMAZMotifRanges <- fread("./data/ChIP_peaks/motif_MAZ.bed")
+
+peakCEBPBRanges <- fread("./data/ChIP_peaks/ENCFF156OCY_CEBPB.bed.gz")
+peakCEBPBMotifRanges <- fread("./data/ChIP_peaks/motif_CEBPB.bed")
+
+peakCTCFRanges <- fread("./data/ChIP_peaks/ENCFF592UDD_CTCF.bed.gz")
+peakCTCFMotifRanges <- fread("./data/ChIP_peaks/motif_CTCF.bed")
+
+propDt <- data.table(motif_prop=c(nrow(peakZNF143MotifRanges)/nrow(peakZNF143Ranges),
+                                  nrow(peakMAZMotifRanges)/nrow(peakMAZRanges),
+                                  nrow(peakCEBPBMotifRanges)/nrow(peakCEBPBRanges),
+                                  nrow(peakCTCFMotifRanges)/nrow(peakCTCFRanges)), 
+                    n_peaks=c(nrow(peakZNF143Ranges), nrow(peakMAZRanges),
+                              nrow(peakCEBPBRanges), nrow(peakCTCFRanges)),
+                    tf=c("ZNF143", "MAZ", "CEBPB", "CTCF"))
+
+if(!file.exists("enrDt.rds")){
+  countMats <- readRDS("countMats.rds")
+  
+  enrDt <- countMats[,.(motif_prop_chip=sum(overlaps_motif=="overlaps motif" & overlaps_chip=="overlaps ChIP")/sum(overlaps_chip=="overlaps ChIP"),
+                        motif_prop_atac=sum(overlaps_motif=="overlaps motif")/.N,
+                        n_chip_motif=sum(overlaps_motif=="overlaps motif" & overlaps_chip=="overlaps ChIP"),
+                        n_atac_motif=sum(overlaps_motif=="overlaps motif")), 
+                        by=c("tf", "paradigm", "es")]
+  enrDt[,enr:=motif_prop_chip/motif_prop_atac]
+  enrDt[,prop_atac_chip:=n_chip_motif/n_atac_motif]
+  saveRDS(enrDt, file="enrDt.rds")
+}else{
+  enrDt <- readRDS("enrDt.rds")
+}
+
+enrDt <- merge(enrDt, propDt, by=c("tf"))
+enrSubDt <- subset(enrDt, es==1 & paradigm=="activation")
+
+nChIP <- ggplot(enrSubDt, aes(y="N", x=tf, fill=n_peaks))+
+geom_tile(alpha=0.85)+
+geom_text(aes(label=round(n_peaks, 2)), color="white",fontface="bold")+
+scale_fill_viridis(option="D", end=0.95)+ # easier to see the white labels
+guides(fill = guide_legend(title = "Number of ChIP-peaks",
+                           label.position = "bottom"))+
+scale_y_discrete(position="right")+
+labs(tag="B")+
+theme_bw()+
+theme(axis.title.x = element_blank(),
+      axis.title.y = element_blank(),
+      legend.position="bottom")
+
+# rename variables
+propDt <- enrSubDt[,c("tf", "paradigm", "es", 
+                   "motif_prop_chip", "motif_prop_atac", 
+                   "motif_prop", "prop_atac_chip")]
+propDt <- melt(propDt, id.vars=c("tf", "paradigm", "es"), 
+               value.name="proportion")
+propDt[,variable:=as.character(variable)]
+propDt[, variable:=fifelse(variable=="motif_prop", 
+                           "input ChIP-peaks", variable)]
+propDt[, variable:=fifelse(variable=="motif_prop_chip", 
+                           "ChIP-peaks overlaping ATAC-Peaks", variable)]
+propDt[, variable:=fifelse(variable=="motif_prop_atac", 
+                           "ATAC-peaks", variable)]
+propDt[, variable:=fifelse(variable=="prop_atac_chip", 
+                           "ChIP- vs ATAC-peaks", variable)]
+
+propFullPlot <- ggplot(propDt, aes(y=variable, x=tf, fill=proportion))+
+geom_tile(alpha=0.85)+
+geom_text(aes(label=round(proportion, 2)), color="white",fontface="bold")+
+scale_fill_viridis(option="D", end=0.95)+
+guides(fill = guide_legend(title="Proportion with a motif",
+                           label.position = "bottom"))+
+scale_y_discrete(position="right")+
+theme_bw()+
+theme(axis.title.x = element_blank(),
+      axis.title.y = element_blank(),
+      legend.position="bottom")
+
+enrPlot <- ggplot(enrSubDt, aes(y="Enrichment", x=tf, fill=enr))+
+geom_tile(alpha=0.85)+
+geom_text(aes(label=round(enr, 2)), color="white", fontface="bold")+
+scale_fill_viridis(option="D", end=0.95)+
+guides(fill = guide_legend(title = "Enrichment motifs ChIP- vs ATAC-peaks",
+                           label.position = "bottom"))+
+scale_y_discrete(position="right")+
+theme_bw()+
+theme(axis.title.x = element_blank(),
+      axis.title.y = element_blank(),
+      legend.position="bottom")
+
+motifPlot <- nChIP / propFullPlot / enrPlot + plot_layout(heights = c(1, 4, 1))
+```
+
+```{r, lfc}
+act <- readRDS("./data/activation.rds")
+hap <- readRDS("./data/haploinsufficiency.rds")
+act[,enr:=scale(enr)]
+act$type <- "activation"
+hap[,enr:=scale(enr)]
+hap$type <- "haploinsufficiency"
+
+lfc <- rbind(act, hap)
+
+lfcDist <- ggplot(lfc, aes(x=enr, y=lfc))+
+  facet_grid(cols=vars(type), scales="free")+
+  geom_pointdensity()+
+  geom_hline(yintercept=0, linetype="dashed")+
+  scale_color_viridis(option="A")+
+  ylab("Log fold change")+
+  xlab("Enrichment over input")+
+  labs(tag="A")+
+  theme_bw()+
+  theme(legend.position="bottom")
+```
+
+
+```{r}
+# Rank plots Enrichment - simulated data
+
+freqAll <- readRDS("freqAll.rds")  
+
+# Calculate enrichment
+freqAll[,prop_chIP:=n_chIP_motif/tot_chIP]
+freqAll[,prop_ATAC:=n_atac_only_motif/tot_atac]
+freqAll[,enr:=prop_chIP/prop_ATAC]
+freqAll[,prop:=n_chIP_motif/n_atac_motif_total]
+
+freqAll[,prop_co_peak:=n_co_peak/n_atac_motif_total]
+freqAll[,prop_co_peak_chip:=n_co_peak_chip/n_chIP_motif]
+
+freqAll[,rank:=frank(enr), by=.(tf, paradigm)]
+freqAll[,percentile:=rank/.N, by=.(tf, paradigm)]
+
+# get motif GC content
+motifs <- getNonRedundantMotifs(format="universal", species=c("Hsapiens"))
+motSeq <- lapply(motifs, function(m)m@consensus)
+motSeq <- data.table(seq=unlist(motSeq), motif_id=names(motSeq))
+motSeq[,GC_content:=(str_count(seq, "GC")*2)/nchar(seq)]
+freqAll <- merge(freqAll, motSeq, by="motif_id", all.x=TRUE)
+
+# get top enriched tfs
+freqTrueDt <- subset(freqAll, tf==motif_id)
+freqMax <- subset(freqAll, rank==1)
+freqTrueDt <- merge(freqTrueDt, freqMax, 
+                    by=c("paradigm", "tf", "es"), suffixes=c("", ".y"))
+freqTrueDt[,enr_diff:=enr-enr.y]
+freqTrueDt <- freqTrueDt[,c("enr", "rank", "enr_diff", "tf", "paradigm", 
+                            "es", "percentile", "prop",
+                            "prop_co_peak", "prop_co_peak_chip", "GC_content")]
+freqTop <- subset(freqAll, rank<=3)
+
+# Rename ZN143
+freqAll[,tf:=fifelse(tf=="ZN143", "ZNF143", tf)]
+freqTrueDt[,tf:=fifelse(tf=="ZN143", "ZNF143", tf)]
+freqTop[,tf:=fifelse(tf=="ZN143", "ZNF143", tf)]
+
+coRankSim <- ggplot(subset(freqAll, paradigm=="activation"), aes(x=percentile, y=enr))+
+  geom_label_repel(subset(freqTop, paradigm=="activation" & motif_id!="CTCF"), 
+             mapping=aes(x=percentile, y=enr, label=motif_id), 
+             alpha=1, color="grey", nudge_x=-0.3, nudge_y=0.3)+
+  geom_label_repel(subset(freqTrueDt, paradigm=="activation"), 
+             mapping=aes(x=percentile, y=enr, label=tf), 
+             alpha=1, color="black", nudge_x=-0.3, nudge_y=0.1,  direction="x")+
+  geom_point(aes(color=prop_co_peak))+
+  geom_point(subset(freqTrueDt, paradigm=="activation"), 
+             mapping=aes(color=prop_co_peak), size=2)+
+  scale_color_gradientn(trans = "sqrt",
+                        breaks=c(1.0,0.75,0.5,0.25,0.1,0),
+                        colours=viridis(length(unique(freqAll$prop_co_peak))), 
+                        name="Proportion of matches co-occuring with true motif")+
+  facet_grid(cols=vars(tf))+
+  ylab("Enrichment of motif in ChIP-peaks")+
+  xlab("Percentile")+
+  labs(tag="C")+
+  theme_bw()+
+  theme(legend.box.just="left",
+        legend.position="bottom", 
+        legend.spacing.x=unit(0.5, 'cm'),
+        legend.key.width = unit(1, "cm"))
+
+coRankGC <- ggplot(subset(freqAll, paradigm=="activation"), aes(x=percentile, y=enr))+
+  geom_label_repel(subset(freqTop, paradigm=="activation" & motif_id!="CTCF"), 
+             mapping=aes(x=percentile, y=enr, label=motif_id), 
+             alpha=1, color="grey", nudge_x=-0.3, nudge_y=0.3)+
+  geom_label_repel(subset(freqTrueDt, paradigm=="activation"), 
+             mapping=aes(x=percentile, y=enr, label=tf), 
+             alpha=1, color="black", nudge_x=-0.3, nudge_y=0.1,  direction="x")+
+  geom_point(aes(color=GC_content))+
+  geom_point(subset(freqTrueDt, paradigm=="activation"), 
+             mapping=aes(color=GC_content), size=2)+
+  scale_color_gradientn(trans = "sqrt",
+                        breaks=c(1.0,0.8,0.75,0.6,0.4,0.25,0.1,0),
+                        colours=inferno(length(unique(freqAll$GC_content))), 
+                        name="GC content")+
+  facet_grid(cols=vars(tf))+
+  ylab("Enrichment of motif in ChIP-peaks")+
+  xlab("Percentile")+
+  scale_size(range=c(0,1))+
+  labs(tag="D")+
+  theme_bw()+
+  theme(legend.box.just = "left", 
+        legend.margin = margin(l=0),
+        legend.position="bottom", 
+        legend.spacing.x=unit(0.5, 'cm'),
+        legend.key.width = unit(1, "cm"))
+
+rankSim <- coRankSim / coRankGC 
+
+# get gc content of peaks
+
+peakZNF143Ranges <- fread("./data/ChIP_peaks/ENCFF500EWB_ZNF143.bed.gz", 
+                    select=1:3, col.names=c("chr", "start", "end"))
+peakZNF143Ranges <- makeGRangesFromDataFrame(as.data.frame(peakZNF143Ranges))
+peakMAZRanges <- fread("./data/ChIP_peaks/ENCFF250FJC_MAZ.bed.gz", 
+                    select=1:3, col.names=c("chr", "start", "end"))
+peakMAZRanges <- makeGRangesFromDataFrame(as.data.frame(peakMAZRanges))
+peakCEBPBRanges <- fread("./data/ChIP_peaks/ENCFF156OCY_CEBPB.bed.gz", 
+                    select=1:3, col.names=c("chr", "start", "end"))
+peakCEBPBRanges <- makeGRangesFromDataFrame(as.data.frame(peakCEBPBRanges))
+peakCTCFRanges <- fread("./data/ChIP_peaks/ENCFF592UDD_CTCF.bed.gz", 
+                    select=1:3, col.names=c("chr", "start", "end"))
+peakCTCFRanges <- makeGRangesFromDataFrame(as.data.frame(peakCTCFRanges))
+
+gcPeakCEBPB <- Repitools::gcContentCalc(peakCEBPBRanges, BSgenome)
+gcPeakCTCF <- Repitools::gcContentCalc(peakCTCFRanges, BSgenome)
+gcPeakMAZ <- Repitools::gcContentCalc(peakMAZRanges, BSgenome)
+gcPeakZNF143 <- Repitools::gcContentCalc(peakZNF143Ranges, BSgenome)
+peakGC <- data.table(tf=c(rep("CEBPB", length(gcPeakCEBPB)),
+                          rep("CTCF", length(gcPeakCTCF)),
+                          rep("MAZ", length(gcPeakMAZ)),
+                          rep("ZNF143", length(gcPeakZNF143))),
+                     gc_content=c(gcPeakCEBPB, gcPeakCTCF, 
+                                  gcPeakMAZ, gcPeakZNF143))
+
+peakGCPlot <- ggplot(peakGC, aes(x=gc_content, color=tf, fill=tf))+
+geom_density(alpha=0.7)+
+scale_color_manual(values=cbbPalette)+
+scale_fill_manual(values=cbbPalette)+
+facet_grid(cols=vars(tf))+
+geom_vline(xintercept=0.5, linetype="dashed")+
+guides(fill = guide_legend(title="Transcription Factor"))+
+guides(color="none")+
+xlab("GC content ChIP-peaks")+
+labs(tag="E")+
+theme_bw()+
+theme(legend.position="none",
+      legend.margin=margin(l=0, r=0, t=0, b=0))
+```
+
+```{r s2, fig.width=16, fig.height=12}
+layout <- "AAAAAAACCCCCCCCCC
+           AAAAAAACCCCCCCCCC
+           BBBBBB#DDDDDDDDDD
+           BBBBBB#DDDDDDDDDD
+           BBBBBB#EEEEEEEEEE
+           BBBBBB#EEEEEEEEEE"
+
+lfcDist+motifPlot+coRankSim+coRankGC+peakGCPlot+plot_layout(design=layout) & 
+  #plot_annotation(tag_levels=list(c("A", "B", "C", "D", "E"))) &
+  theme(plot.tag = element_text(face="bold", size=18),
+        strip.text=element_text(size=12),
+        axis.text=element_text(size=12),
+        axis.title=element_text(size=14),
+        legend.justification = "center",
+        legend.text = element_text(size=10),
+        legend.title = element_text(size=12))
+```
+
+
+**`r getFigNb()` : Overview of the simulated TFs and effect paradigms. **
+**A:** Relationship between log2FC and peak enrichment under the two simulation paradigms.
+**B:** Number of peaks, proportion of ChIP and/or ATAC peaks with a motif, and fold-enrichment of the ChIP-peaks for the motif across the four TFs.
+**C-D:** Enrichment of all tested motifs among the ChIP peaks (relative to ATAC peaks), with the true motif labeled in black. The dots are colored either by co-occurence with the true motif (**C**) or by GC content (**D**).
+**E:** GC content distributions of the ChIP-peaks of each TF.
+
+
+\newpage
+
+
+# `r getFigNb(TRUE)`
+
+```{r, peak counts}
+countMats <- readRDS("countMats_subset.rds")
+countPlot <- ggplot(countMats, aes(x=log2(count), color=sample)) +
+  geom_density() + facet_nested(paradigm+tf~es) +
+  scale_color_manual(values=c(brewer.pal(5, "Reds")[3:5], brewer.pal(5, "Blues")[3:5])) +
+  labs(tag="A") + theme_bw()
+
+countMats[,mean_group:=mean(count), 
+          by=c("peak_id", "tf", "paradigm", "es", "varied_atac", "group")]
+countMats[,mean_group1:=fifelse(group=="group1", mean_group, as.numeric(NA))]
+countMats[,mean_group2:=fifelse(group=="group2", mean_group, as.numeric(NA))]
+
+meanCounts <- countMats[,.(var=var(count),
+                           mean=mean(count),
+                           logFC=log2(max(mean_group1, na.rm=TRUE)/max(mean_group2, na.rm=TRUE)),
+                           overlaps_motif=unique(overlaps_motif),
+                           overlaps_chip=unique(overlaps_chip)), 
+                        by=c("peak_id", "tf", "paradigm", "es", "varied_atac")]
+
+set.seed(123)
+meanCounts <- meanCounts[,.SD[sample(peak_id, 1.2e5)], by=.(paradigm, es, tf)]
+
+# Mean count vs variance (stratified by effect strength & paradigm)
+meanVarPlot <- ggplot(meanCounts, aes(x=log10(mean), y=log10(var)))+
+               facet_nested(paradigm+tf~es)+
+               xlab("Log10(mean count)")+
+               ylab("Log10(var)")+
+               ggrastr::geom_point_rast(size=0.5)+ geom_density2d() +
+               labs(tag="B")+
+               theme_bw()
+```
+
+
+```{r meanvar, fig.width=14, fig.height=8}
+(countPlot / meanVarPlot ) + 
+  plot_annotation(tag_levels=list(c("A", "B"))) &
+  theme(plot.tag = element_text(face="bold", size=18),
+        axis.title=element_text(size=16),
+        legend.title=element_text(size=16),
+        axis.text=element_text(size=12),
+        legend.text=element_text(size=12))
+```
+
+
+
+**`r getFigNb()` : Distributions of read counts and variance of the simulations**
+**A:** Peaks read count distributions of the original (denoted "0") and simulated samples with 1-fold and 3-fold effect sizes, for an example TF across both paradigms.
+**B:** Mean-variance relationship of the original (denoted "0") and simulated samples.
+
+
+\newpage
+
+
+# `r getFigNb(TRUE)`
+
+
+```{r}
+# MA plots
+if(!file.exists("MAdat.subsampled.rds")){
+  countMats <- readRDS("countMats.rds")
+  countMats[,mean_group:=mean(count), 
+            by=c("peak_id", "tf", "paradigm", "es", "varied_atac", "group")]
+  countMats[,mean_group1:=fifelse(group=="group1", mean_group, as.numeric(NA))]
+  countMats[,mean_group2:=fifelse(group=="group2", mean_group, as.numeric(NA))]
+  
+  meanCounts <- countMats[,.(var=var(count),
+                             mean=mean(count),
+                             logFC=log2(max(mean_group1, na.rm=TRUE)/max(mean_group2, na.rm=TRUE)),
+                             overlaps_motif=unique(overlaps_motif),
+                             overlaps_chip=unique(overlaps_chip)), 
+                          by=c("peak_id", "tf", "paradigm", "es", "varied_atac")]
+  set.seed(123)
+  meanCounts <- meanCounts[,.SD[sample(peak_id, 1.2e5)], by=.(paradigm, es, tf)]
+  saveRDS(meanCounts, "MAdat.subsampled.rds")
+}else{
+  meanCounts <- readRDS("MAdat.subsampled.rds")
+}
+
+```
+
+```{r}
+colsChIP <- c(cbbPalette[2], cbbPalette[3])
+names(colsChIP) <- c("no overlap", "overlaps ChIP-peak")
+meanCounts$overlaps_chip <- factor(meanCounts$overlaps_chip, 
+                                  levels=c("no overlap", "overlaps ChIP-peak"),
+                                    ordered=TRUE)
+
+colsMotif <- c(cbbPalette[5], cbbPalette[4])
+names(colsMotif) <- c("no overlap", "overlaps motif")
+meanCounts$overlaps_motif <- factor(meanCounts$overlaps_motif, 
+                                    levels=c("no overlap", "overlaps motif"),
+                                    ordered=TRUE)
+meanPointsMotif <- meanCounts[, .(mean_access=mean(mean),
+                                  mean_lfc=mean(logFC[is.finite(logFC)], na.rm=TRUE)), 
+                              by=.(paradigm,es,tf,overlaps_motif)]
+meanPointsChIP <- meanCounts[, .(mean_access=mean(mean),
+                                  mean_lfc=mean(logFC[is.finite(logFC)], na.rm=TRUE)), 
+                             by=.(paradigm,es,tf,overlaps_chip)]
+
+
+ovMotif <- ggplot(meanCounts, aes(x=log10(mean), y=logFC, color=overlaps_motif))+
+  facet_nested(paradigm ~ tf + es, scales="free")+
+  #geom_point(size=0.25, alpha=0.3)+
+  #geom_density2d(linewidth=0.25, size=0.5)+
+  #geom_point(subset(meanCounts, overlaps_motif=="no overlap"), 
+  #           mapping=aes(x=log10(mean), y=logFC, color=overlaps_motif), size=0.25, alpha=0.3)+
+  #geom_density2d(subset(meanCounts, overlaps_motif=="overlaps motif"),
+  #               mapping=aes(x=log10(mean), y=logFC, color=overlaps_motif),linewidth=0.25, size=0.5)+
+  geom_density2d(size=0.5)+
+  geom_point(data=meanPointsMotif, mapping=aes(x=log10(mean_access), y=mean_lfc, color=overlaps_motif), size=3)+
+  #geom_point(data=meanPointsMotif, aes(x=log10(mean_access), y=mean_lfc, color=overlaps_motif), size=3)+
+  #geom_point(size=0.5, alpha=0.3)+
+  geom_hline(yintercept=2, linetype="dashed")+
+  geom_hline(yintercept=0)+
+  geom_vline(xintercept=1.5, linetype="dotted")+
+  geom_hline(yintercept=-2, linetype="dashed")+
+  scale_color_manual(values=colsMotif, name="overlaps ChIP-peak:")+
+  guides(colour = guide_legend(override.aes = list(size=3, alpha=1, linewidth=3)), title="")+
+  xlab("log10(Mean Accessibility)")+
+  theme_bw()+
+  theme(legend.position="bottom",
+         axis.text.x = element_text(angle = 90,
+                                   vjust = 0.5,
+                                   hjust = 0.5))
+ovChIP <- ggplot(meanCounts, aes(x=log10(mean), y=logFC, color=overlaps_chip))+
+  facet_nested(paradigm ~ tf + es)+
+  geom_density2d(size=0.5)+
+  geom_point(data=meanPointsChIP, mapping=aes(x=log10(mean_access), y=mean_lfc, color=overlaps_chip), size=3)+
+  #geom_point(size=0.5, alpha=0.3)+
+  geom_hline(yintercept=2, linetype="dashed")+
+  geom_hline(yintercept=0)+
+  geom_vline(xintercept=1.5, linetype="dotted")+
+  geom_hline(yintercept=-2, linetype="dashed")+
+  scale_color_manual(values=colsChIP, name="overlaps motif:")+
+  xlab("log10(Mean Accessibility)")+
+  guides(colour = guide_legend(override.aes = list(size=3, alpha=1, linewidth=3)), title="")+
+  theme_bw()+
+  theme(legend.position="bottom",
+        axis.text.x = element_text(angle = 90,
+                                   vjust = 0.5,
+                                   hjust = 0.5))
+```
+
+
+```{r MAplotsOV, fig.width=14, fig.height=8}
+ovChIP / ovMotif
+```
+
+
+**`r getFigNb()` : MA plots showing the simulated effects**
+For each factor, simulated paradigm and effect strength, the distribution of peaks logFC between conditions as a function of mean accessibility is plotted, separating either (**A**) ATAC peaks overlapping a ChIP peak or not, or (**B**) ATAC peaks overlapping or not a motif for the TF. For visibility, the two sets of peaks were subsampled to a more comparable size.
+
+
+\newpage
+
+
+# `r getFigNb(TRUE)`
+
+```{r}
+# Import method outputs
+rawFiles <- list.files("./data/sim_data_es", recursive=TRUE, full.names=TRUE)
+rawFiles <- rawFiles[grepl("with_pvalues", rawFiles)]
+rawFiles <- rawFiles[!grepl("_0_", rawFiles)]
+
+res <- lapply(rawFiles, readRDS)
+res <- lapply(res, as.data.table, keep.rownames=TRUE)
+names(res) <- rawFiles
+
+# organize               
+res <- rbindlist(res, idcol="folder", use.names=TRUE, fill=TRUE)
+res[,setting:=tstrsplit(folder, split="/", keep=4)]
+res[,c("tf", "paradigm", "es"):=tstrsplit(setting, keep=1:3, split="_")]
+res[,method:=tstrsplit(folder, keep=7, split="/")]
+res[,method:=tstrsplit(method, keep=1, split=".", fixed=TRUE)]
+
+# get baseline peformances (es==0)
+baseLineFile <- list.files("./data/data_baseline", recursive=TRUE, full.names=TRUE)
+baseLineFile <- baseLineFile[grepl("with_pvalues", baseLineFile)]
+resBase <- lapply(baseLineFile, readRDS)
+resBase <- lapply(resBase, as.data.table, keep.rownames=TRUE)
+names(resBase) <- baseLineFile
+resBase <- rbindlist(resBase, idcol="folder", use.names=TRUE, fill=TRUE)
+resBase[,method:=tstrsplit(folder, keep=6, split="/")]
+resBase[,method:=tstrsplit(method, keep=1, split=".", fixed=TRUE)]
+
+params <- as.data.table(expand.grid(tf=c("CEBPB", "CTCF", "MAZ", "ZNF143"),
+                                    paradigm=c("activation", "haploinsufficiency")))
+resBase <- lapply(1:nrow(params), function(i){
+  tf <- params[i,]$tf
+  paradigm <- params[i,]$paradigm
+  resBase$tf <- tf
+  resBase$es <- 0
+  resBase$paradigm <- paradigm
+  resBase
+})
+resBase <- rbindlist(resBase)
+res <- rbind(res, resBase, use.names=TRUE, fill=TRUE)
+res <- renameMethods(res)
+
+# calculate ranks
+res[,rank:=order(p, -abs(logFC)), , by=c("tf", "paradigm", "es", "method")]
+resSub <- subset(res, rn %in% c("CEBPB", "MAZ", "ZNF143", "ZN143", "CTCF"))
+resSub <- subset(resSub, rn==tf | c(rn=="ZN143" & tf=="ZNF143"))
+resSub[,is_sig:=padj<=0.05]
+resSub <- subset(resSub, method!="msVIPER")
+resSim <- resSub
+
+
+
+# effect strength rank curves - positive control
+
+rawFiles <- list.files("./data/sim_data_pos_control", recursive=TRUE, full.names=TRUE)
+rawFiles <- rawFiles[grepl("with_pvalues", rawFiles)]
+rawFiles <- rawFiles[!grepl("_0_", rawFiles)]
+resPos <- lapply(rawFiles, readRDS)
+resPos <- lapply(resPos, as.data.table, keep.rownames=TRUE)
+names(resPos) <- rawFiles
+                    
+resPos <- rbindlist(resPos, idcol="folder", use.names=TRUE, fill=TRUE)
+resPos[,setting:=tstrsplit(folder, split="/", keep=4)]
+resPos[,c("tf", "paradigm", "es"):=tstrsplit(setting, keep=1:3, split="_")]
+resPos[,method:=tstrsplit(folder, keep=7, split="/")]
+resPos[,method:=tstrsplit(method, keep=1, split=".", fixed=TRUE)]
+
+# get effect strength 0 files
+baseLineFile <- list.files("./data/data_baseline", recursive=TRUE, full.names=TRUE)
+baseLineFile <- baseLineFile[grepl("with_pvalues", baseLineFile)]
+resBase <- lapply(baseLineFile, readRDS)
+resBase <- lapply(resBase, as.data.table, keep.rownames=TRUE)
+names(resBase) <- baseLineFile
+resBase <- rbindlist(resBase, idcol="folder", use.names=TRUE, fill=TRUE)
+resBase[,method:=tstrsplit(folder, keep=6, split="/")]
+resBase[,method:=tstrsplit(method, keep=1, split=".", fixed=TRUE)]
+
+params <- as.data.table(expand.grid(tf=c("CEBPB", "CTCF", "MAZ", "ZNF143"),
+                                    paradigm=c("activation", "haploinsufficiency")))
+resBase <- lapply(1:nrow(params), function(i){
+  tf <- params[i,]$tf
+  paradigm <- params[i,]$paradigm
+  resBase$tf <- tf
+  resBase$es <- 0
+  resBase$paradigm <- paradigm
+  resBase
+})
+resBase <- rbindlist(resBase)
+resPos <- rbind(resPos, resBase, use.names=TRUE, fill=TRUE)
+resPos <- subset(resPos, method!="msVIPER")
+resPos <- renameMethods(resPos)
+
+# relcalculate ranks
+resPos[,rank:=order(p, -abs(logFC)), by=c("tf", "paradigm", "es", "method")]
+resPosSub <- subset(resPos, rn %in% c("CEBPB", "MAZ", "ZNF143", "ZN143", "CTCF"))
+resPosSub <- subset(resPosSub, rn==tf | c(rn=="ZN143" & tf=="ZNF143"))
+resPosSub[,is_sig:=padj<=0.05]
+resPosSub <- subset(resPosSub, method!="msVIPER")
+resPosSub$type <- "Only motif containing ChIP-peaks"
+resSub$type <- "All ChIP-peaks"
+
+resAll <- rbind(resPosSub, resSub, fill=TRUE, check.names=TRUE)
+
+# sizes are actually the same test it!!!  
+act <- ggplot(subset(resAll, paradigm=="activation"), aes(x=es, y=rank, group=method)) +
+geom_line(data=subset(resAll, type=="All ChIP-peaks" & paradigm=="activation"), color="grey")+
+geom_point(data=subset(resAll, type=="All ChIP-peaks" & paradigm=="activation"), color="grey")+
+geom_label_repel(data=subset(resAll, type=="All ChIP-peaks" & paradigm=="activation" & !is_sig), 
+                 color="grey", aes(label=rank, size=is_sig), direction = "y", nudge_y=5, seed=43)+
+geom_label_repel(data=subset(resAll, type=="All ChIP-peaks" & paradigm=="activation" & is_sig), fontface=2, 
+                 color="grey", aes(label=rank, size=is_sig), direction = "y", nudge_y=5, seed=43)+
+geom_line(data=subset(resAll, type=="Only motif containing ChIP-peaks" & paradigm=="activation"))+
+geom_label(subset(resAll, paradigm=="activation" & type=="Only motif containing ChIP-peaks"), 
+           mapping=aes(label=rank, x=es, y=rank, color=padj, size=is_sig), label.size=1)+
+geom_text(subset(resAll, is_sig & paradigm=="activation" & type=="Only motif containing ChIP-peaks"), 
+          mapping=aes(label=rank, x=es, y=rank), color="black", label.size=NA, size=4.2, fontface=2)+ # size=5
+scale_size_manual(values=c("TRUE"=4.2, "FALSE"=4.2), name="significant")+
+guides(size=guide_legend(override.aes = list(fontface=c(1, 2))))+
+facet_grid(rows=vars(tf), cols=vars(method), scales="free")+
+scale_color_viridis(option="D", direction=-1, name="adjusted p-value")+
+xlab("Effect Strength")+
+ylab("Rank of true TF")+
+ggtitle("Activation")+
+scale_y_sqrt()+
+theme_bw()+
+theme(legend.position="bottom",
+      legend.title=element_text(size=12),
+      legend.text=element_text(size=10))
+
+hap <- ggplot(subset(resAll, paradigm=="haploinsufficiency"), aes(x=es, y=rank, group=method)) +
+geom_line(data=subset(resAll, type=="All ChIP-peaks" & paradigm=="haploinsufficiency"), color="grey")+
+geom_point(data=subset(resAll, type=="All ChIP-peaks" & paradigm=="haploinsufficiency"), color="grey")+
+geom_label_repel(data=subset(resAll, type=="All ChIP-peaks" & paradigm=="haploinsufficiency" & !is_sig), 
+                 color="grey", aes(label=rank, size=is_sig), direction = "y", nudge_y=5, seed=43)+
+geom_label_repel(data=subset(resAll, type=="All ChIP-peaks" & paradigm=="haploinsufficiency" & is_sig), fontface=2, 
+                 color="grey", aes(label=rank, size=is_sig), direction = "y", nudge_y=5, seed=43)+
+geom_line(data=subset(resAll, type=="Only motif containing ChIP-peaks" & paradigm=="haploinsufficiency"))+
+geom_label(subset(resAll, paradigm=="haploinsufficiency" & type=="Only motif containing ChIP-peaks"), 
+           mapping=aes(label=rank, x=es, y=rank, color=padj, size=is_sig), label.size=1)+
+geom_text(subset(resAll, is_sig & paradigm=="haploinsufficiency" & type=="Only motif containing ChIP-peaks"), 
+          mapping=aes(label=rank, x=es, y=rank), color="black", label.size=NA, size=4.2, fontface=2)+ # size=5
+scale_size_manual(values=c("TRUE"=4.2, "FALSE"=4.2), name="significant")+
+guides(size=guide_legend(override.aes = list(fontface=c(1, 2))))+
+facet_grid(rows=vars(tf), cols=vars(method), scales="free")+
+scale_color_viridis(option="D", direction=-1, name="adjusted p-value")+
+xlab("Effect Strength")+
+ylab("Rank of true TF")+
+ggtitle("Haploinsufficiency")+
+scale_y_sqrt()+
+theme_bw()+
+theme(legend.position="bottom",
+      legend.title=element_text(size=12),
+      legend.text=element_text(size=10))
+```
+
+
+```{r posControlRankLines, fig.width=16, fig.height=14}
+(act / hap) +plot_layout(guides = "collect") &
+  theme(plot.tag = element_text(face="bold", size=18), legend.position="bottom")
+```
+
+**`r getFigNb()` : Positive control of the simulations**
+Shown are rank and significance assigned by each method to the true motif across simulations parameters (TF, paradigm and effect strength). In light gray are the normal simulations, while the dark represent positive controls where a difference between the groups was only introduced in the peaks overlapping a motif match.
+
+
+\newpage
+
+
+# `r getFigNb(TRUE)`
+
+
+
+```{r, echo=FALSE}
+relAUCplot2 <- function(res, doDraw=TRUE, column_title="Datasets", 
+                        column_order=NULL, row_order=NULL, ..., 
+                        type=c("propOfMax","MAD","relAUC"), cellLabelFontsize=8,
+                        datasetInfo=data.frame(
+                           type=sapply(getDatasets(), FUN=function(x) x$type))){
+  
+  res <- as.data.table(res)
+  res <- copy(res)
+  setorder(res, tf, effect_strength)
+  res[,propAUC:=AUC/max(AUC, na.rm=TRUE), by=.(tf, paradigm)]
+  
+  m1 <- data.table::dcast(res, paradigm+method~effect_strength+tf, value.var="relAUC") 
+  m <- data.table::dcast(res, paradigm+method~effect_strength+tf, value.var="propAUC") 
+  rankMat <- data.table::dcast(res, paradigm+method~effect_strength+tf, value.var="rank")
+  methods <- rankMat$method
+  paradigm <- rankMat$paradigm
+  
+  rankMat$method <- NULL
+  rankMat$paradigm <- NULL
+  m1$method <- NULL
+  m1$paradigm <- NULL
+  m$method <- NULL
+  m$paradigm <- NULL
+  
+  rankMat <- as.matrix(rankMat)
+  rankMat <- sqrt(rankMat)
+  m <- as.matrix(m)
+  m1 <- as.matrix(m1)
+  m <- apply(m, 2, as.numeric)
+  m1 <- apply(m1, 2, as.numeric)
+
+  rownames(rankMat) <- rownames(m) <- rownames(m1) <- paste(methods, paradigm, sep="_")
+  
+  ancols <- list(type=c(deletion="darkorange3", dTag="black", ligand="darkslateblue"))
+  
+  colAnnot <- data.table(dataset=colnames(rankMat))
+  colAnnot[,c("Effect strength", "TF"):=tstrsplit(dataset, split="_", keep=1:2)]
+  colEs <- brewer.pal(5, "Blues")
+  names(colEs) <- c(0, 0.25, 0.5, 1, 3)
+  tfCols <- c("darkorange3", "black", "darkslateblue", "darkolivegreen")
+  names(tfCols) <- c("CEBPB", "CTCF", "MAZ", "ZNF143")
+  
+  rankMat <- rankMat[,colnames(rankMat)[order(colAnnot$TF)]]
+  m <- m[,colnames(m)[order(colAnnot$TF)]]
+  m1 <- m1[,colnames(m1)[order(colAnnot$TF)]]
+  setorder(colAnnot, TF)
+  
+  #setorder(colAnnot, tf, effect_strength)
+  colan <- HeatmapAnnotation(df=as.data.frame(colAnnot[,c("TF", "Effect strength"), with=FALSE]),
+                             col=list("TF"=tfCols,
+                                      "Effect strength"=colEs), 
+                             show_annotation_name=FALSE)
+
+  rann <- getMethodAnno(methods)
+  rowAnnot <- data.table(LFCbased=rann$df$LFCbased,
+                         family=rann$df$family,
+                         paradigm=paradigm)
+  rownames(rowAnnot) <- rownames(rankMat)
+  
+  rowann <- rowAnnotation(df=rowAnnot, col=rann$col,
+                          show_legend=colnames(rann$df)=="family")
+  ro <- rownames(rankMat)[order(rowMeans(rankMat, na.rm=TRUE))]
+  h <- ComplexHeatmap::Heatmap(m, cluster_rows=FALSE, cluster_columns=FALSE,
+          cell_fun=function(j, i, x, y, width, height, fill) {
+        v <- gsub("^0","",round(m1[i,j],2))
+        if(is.na(v)) v <- "."
+        if(v=="") v <- "0"
+        if(v=="NaN") v <- "NA"
+        grid.text(v, x, y, gp=gpar(fontsize=ifelse(is.na(m1[i,j]),6,
+                                                   cellLabelFontsize),
+                                   col=ifelse(m[i,j]<0.5,"lightgrey","black")))
+      },
+     col=viridisLite::magma(100), 
+     name="Relative\nnetwork AUC",
+     column_title=column_title, 
+     column_labels=colAnnot$`Effect strength`,
+     row_labels=methods,
+     row_order=ro, 
+     column_split=colAnnot$TF,
+     row_split=rowAnnot$paradigm,
+     column_order=colnames(rankMat)[order(colAnnot$TF, colAnnot$`Effect strength`)],
+     row_names_side="left", top_annotation=colan)
+  
+  if(!doDraw) return(h)
+  draw(h, merge=TRUE)
+}
+
+library(RColorBrewer)
+library(ComplexHeatmap)
+rankHeatmap2 <- function(res, rankBreaks=c(1,10,30,75,150,300,600), ..., 
+                         column_title="Datasets", doDraw=TRUE, rowann=NULL,
+                         datasetInfo=data.frame(type=sapply(getDatasets(), FUN=function(x) x$type)),
+                         cellLabelFontsize=8,
+                         transform=TRUE,
+                         value.var="rank"){
+  setorder(res, tf, effect_strength)
+  
+  rankMat <- data.table::dcast(res, paradigm+method~effect_strength+tf, value.var=value.var)
+  methods <- rankMat$method
+  paradigm <- rankMat$paradigm
+  rankMat$method <- NULL
+  rankMat$paradigm <- NULL
+  
+  rankMat <- as.matrix(rankMat)
+  if(transform) rankMat <- sqrt(rankMat)
+  rownames(rankMat) <- paste(methods, paradigm, sep="_")
+  
+  ancols <- list(type=c(deletion="darkorange3", dTag="black", ligand="darkslateblue"))
+  
+  colAnnot <- data.table(dataset=colnames(rankMat))
+  colAnnot[,c("Effect strength", "TF"):=tstrsplit(dataset, split="_", keep=1:2)]
+  colEs <- brewer.pal(5, "Blues")
+  names(colEs) <- c(0, 0.25, 0.5, 1, 3)
+  tfCols <- c("darkorange3", "black", "darkslateblue", "darkolivegreen")
+  names(tfCols) <- c("CEBPB", "CTCF", "MAZ", "ZNF143")
+  
+  rankMat <- rankMat[,colnames(rankMat)[order(colAnnot$TF)]]
+  setorder(colAnnot, TF)
+  
+  #setorder(colAnnot, tf, effect_strength)
+  colan <- HeatmapAnnotation(df=as.data.frame(colAnnot[,c("TF", "Effect strength"), with=FALSE]),
+                             col=list("TF"=tfCols,
+                                      "Effect strength"=colEs), 
+                             show_annotation_name=FALSE)
+
+  bdist <- log10(rankBreaks[-1]-rankBreaks[-length(rankBreaks)])
+  
+  rann <- getMethodAnno(methods)
+  rowAnnot <- data.table(LFCbased=rann$df$LFCbased,
+                         #family=rann$df$family,
+                         paradigm=paradigm)
+  rownames(rowAnnot) <- rownames(rankMat)
+  
+  rowann <- rowAnnotation(df=rowAnnot, col=rann$col,
+                          show_legend=colnames(rann$df)=="family")
+  ro <- rownames(rankMat)[order(rowMeans(rankMat, na.rm=TRUE))]
+
+  
+  h <- ComplexHeatmap::Heatmap(rankMat, cluster_rows=FALSE, cluster_columns=FALSE,
+          cell_fun=function(j, i, x, y, width, height, fill) {
+            grid.text(sprintf("%1.0f", rankMat[i, j]^2), x, y,
+                      gp = gpar(fontsize=ifelse(is.na(rankMat[i, j]),6,
+                                                cellLabelFontsize)))
+          },
+     col=viridisLite::viridis(100, direction=-1), name="Rank of\ntrue TF",
+     column_title=column_title, 
+     column_labels=colAnnot$`Effect strength`,
+     row_labels=methods,
+     row_order=ro, 
+     column_split=colAnnot$TF,
+     row_split=rowAnnot$paradigm,
+     column_order=colnames(rankMat)[order(colAnnot$TF, colAnnot$`Effect strength`)], 
+     left_annotation=rowann, row_names_side="left", top_annotation=colan,
+     heatmap_legend_param=list(at=rev(sqrt(rankBreaks)),
+                               labels=rev(c("top",rankBreaks[-1])),
+                               break_dist=rev(bdist), legend_height=unit(3.5, "cm"),
+                               labels_gp=gpar(fontsize=9)))
+  
+  if(!doDraw) return(h)
+  draw(h, merge=TRUE)
+}
+```
+
+```{r, fig.width=15, fig.height=12}
+res <- readRDS("res_all_effect_strength.rds")
+res <- as.data.table(res)
+res[,c("tf","paradigm","effect_strength"):=tstrsplit(dataset, split="_", keep=c(1,2,3))]
+
+res <- renameMethods(as.data.frame(res))
+h1 <- rankHeatmap2(copy(res), doDraw=FALSE, column_title="Rank of true TF", row_names_gp=gpar(fontsize=10))
+h2 <- relAUCplot2(copy(res), doDraw=FALSE, column_title="Network Score")
+h <- grid.grabExpr(draw(h1 + h2, merge=TRUE))
+fig <- cowplot::plot_grid(h)
+fig
+```
+
+
+
+\newpage
+
+
+# `r getFigNb(TRUE)`
+
+```{r, eval=TRUE}
+# FLD
+if(!file.exists("sim_fld.rds")){
+  simfrags <- readRDS("./data/sim_data_fld/MAZ_activation_0_FALSE_group/seq_files/simfrags.rds")
+  simFrags <- simfrags$sim
+  simFrags[,fld:=fifelse(group=="group1", "NF-enriched", "Mono-enriched")]
+  simFrags$fld <- factor(simFrags$fld, 
+                         levels=c("NF-enriched", "Mono-enriched"), ordered=TRUE)
+  fragDat <- simFrags[which(simFrags$sample %in% c("group1_1","group2_1")), c("fld","width","gc_content")]
+  saveRDS(fragDat, "sim_frag_data.rds")
+}else{
+  fragDat <- readRDS("sim_frag_data.rds")
+}
+
+fldDist <- ggplot(fragDat, aes(x=width, color=fld))+
+geom_density(alpha=0.7, lwd=2)+
+scale_color_manual(values=c("#b8db52fd", "#4d9d89fd"))+
+xlab("Fragment Length")+
+guides(color = guide_legend(title = "Fragment length distributions"))+
+xlim(c(0,1000))+
+theme_bw()+
+theme(legend.title = element_blank(),
+      legend.position = "bottom",
+      legend.margin=margin(0,0,0,0),
+      legend.box.margin=margin(0,0,0,0))
+```
+
+```{r}
+rawFiles <- list.files("./data/sim_data_fld", recursive=TRUE, full.names=TRUE)
+rawFiles <- rawFiles[grepl("with_pvalues", rawFiles)]
+res <- lapply(rawFiles, readRDS)
+res <- lapply(res, as.data.table, keep.rownames=TRUE)
+names(res) <- rawFiles
+                    
+res <- rbindlist(res, idcol="folder", use.names=TRUE, fill=TRUE)
+res[,setting:=tstrsplit(folder, split="/", keep=4)]
+res[,c("tf", "paradigm", "es", "fld_1", "fld_2"):=tstrsplit(setting, keep=c(1:3,5,6), split="_")]
+res[,fld:=paste(fld_1, fld_2, sep="_")]
+res[,method:=tstrsplit(folder, keep=7, split="/")]
+res[,method:=tstrsplit(method, keep=1, split=".", fixed=TRUE)]
+
+# relcalculate ranks
+res[,rank:=order(p, -abs(logFC)), by=c("tf", "paradigm", "es", "method", "fld")]
+res <- subset(res, rn %in% c("CEBPB", "MAZ", "ZNF143", "ZN143", "CTCF"))
+res <- subset(res, rn==tf | c(rn=="ZN143" & tf=="ZNF143"))
+res[,is_sig:=padj<=0.05]
+res <- renameMethods(res)
+
+# rename FLD types
+res[,fld:=fifelse(fld=="group_NA", "grouped", fld)]
+res[,fld:=fifelse(fld=="mono_enriched", "All Mononucleosome enriched", fld)]
+res[,fld:=fifelse(fld=="nf_enriched", "All Nucleosome-free enriched", fld)]
+
+hap <- ggplot(subset(res, paradigm=="haploinsufficiency"), 
+              aes(x=es, y=rank, group=fld, color=fld)) +
+geom_line()+
+geom_text_repel(aes(label=rank), 
+                direction="y", size=2.5, segment.color = NA, nudge_y=10)+
+geom_point(aes(size=is_sig))+
+scale_size_manual(values=c(2.5, 5), name="significant")+
+scale_color_manual(values=cbbPalette, name="FLD type")+
+xlab("Effect Strength")+
+ggtitle("Haploinsufficiency")+
+facet_grid(rows=vars(tf), cols=vars(method), scales="free")+
+scale_y_sqrt()+
+theme_bw()+
+theme(legend.position="bottom")
+
+act <- ggplot(subset(res, paradigm=="activation"), 
+              aes(x=es, y=rank, group=fld, color=fld)) +
+geom_line()+
+geom_text_repel(aes(label=rank), direction="y", size=2.5, segment.color = NA, nudge_y=10)+
+geom_point(aes(size=is_sig))+
+scale_color_manual(values=cbbPalette, name="FLD type")+
+scale_size_manual(values=c(2.5, 5), name="significant")+
+xlab("Effect Strength")+
+ggtitle("Activation")+
+facet_grid(rows=vars(tf), cols=vars(method), scales="free")+
+scale_y_sqrt()+
+theme_bw()+
+theme(legend.position="bottom")
+# 
+# (act / hap) + plot_annotation(tag_levels=list(c("A", "B")))+
+#   plot_layout(guides = "collect") &
+#   theme(plot.tag = element_text(face="bold", size=18), legend.position="bottom")
+
+fldLines <- ggplot(res, aes(x=es, y=rank, group=fld, color=fld)) +
+geom_line(alpha=0.5, lwd=0.7)+
+geom_point(aes(size=is_sig), alpha=0.5)+
+scale_color_manual(values=cbbPalette, name="FLD design")+
+scale_size_manual(values=c(2.5, 5), name="significant")+
+ylab("Rank of true TF")+
+xlab("Effect Strength")+
+facet_nested(paradigm+tf~method, scales="free")+
+scale_y_continuous(trans="log1p", breaks=c(500,200,100,50,10))+
+theme_bw()+
+theme(legend.position="bottom", legend.justification="left")
+ggsave("fld_perform_lines_alt.png", units="cm", width=35, height=20)
+
+fldHm <- ggplot(res, aes(y=method, x=es, color=rank))+
+geom_point(aes(size=is_sig))+
+facet_nested(paradigm+tf~ fld, scales="free", switch="y")+
+#scale_color_viridis(option="D", direction=-1,
+#                    name="Rank of true TF",
+#                    end=0.9)+ # easier to see than the very bright yellow
+scale_color_gradientn(trans = "sqrt",
+                      breaks=c(500,200,100,50,10),
+                     colours=magma(length(unique(res$rank)),
+                                     direction=-1, end=0.95), # easier to see than the very bright yellow
+                     #direction=-1,
+                     name="Rank of true TF")+
+                     #end=0.9)+
+scale_size_manual(values=c(4, 8),
+                  name="significant")+
+scale_y_discrete(position="right")+
+theme_bw()+
+theme(legend.position="bottom",
+      axis.title.x=element_blank(),
+      axis.title.y=element_blank(),
+      legend.key.width = unit(1, "cm"),
+      legend.justification="center")
+
+d <- data.frame(x=0, y=0, image="variations_fld.png")
+ovFig1 <- ggplot(d, aes(x, y)) + 
+  geom_image(aes(image=image), size=0.5,by="width")+ #, asp=1.535
+  scale_size_identity()+
+  theme_void()
+
+layout <- "
+AAA#CCCC
+BBBBCCCC"
+
+img <- my_image <- readPNG("variations_fld.png", native = TRUE)
+ovFig1 <- ggplot() + 
+  scale_x_continuous(expand=c(0,0)) +
+  scale_y_continuous(expand=c(0,0)) +
+  theme_void() + annotation_custom(grid::rasterGrob(img), 
+                    xmin = -Inf, ymin = -Inf, xmax = Inf, ymax = Inf)+
+  theme(panel.background = element_rect(fill = "transparent", colour = NA),
+    plot.background = element_rect(fill = "transparent", colour = NA),
+    panel.grid = element_blank(),
+    panel.border = element_blank(),
+    plot.margin = unit(c(-1.25, 1,-1.25,-1.25), "lines"),
+    panel.margin = unit(c(0,0,0,0), "lines"),
+    axis.ticks = element_blank(),
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    axis.line = element_blank(),
+    legend.position = "none",
+    axis.ticks.length = unit(0, "null"),
+    axis.ticks.margin = unit(0, "null"),
+    legend.margin = unit(0, "null"))
+```
+
+
+```{r, fig.width=12, fig.height=12}
+fldPlot <- (ovFig1 + fldDist + fldHm) + 
+  plot_annotation(tag_levels=list(c("A", "B", "C")))+
+  plot_layout(widths = c(1.5, 1.5), heights=c(1,3), design="
+              12
+              33") & # design=layout
+  theme(plot.tag=element_text(face="bold", size=18))
+fldPlot
+# ggsave("sim_s6.png", units="cm", 
+#        width=30, height=30)
+# 
+# (ovFig1 + fldDist + fldLines) + 
+#   plot_annotation(tag_levels=list(c("A", "B", "C")))+
+#   plot_layout(widths = c(1, 1.5), heights=c(1,3), design="
+#               12
+#               33") & # design=layout
+#   theme(plot.tag=element_text(face="bold", size=18))
+# ggsave("sim_s6_alt.png", units="cm", 
+#        width=40, height=30)
+```
+
+**`r getFigNb()` : Robustness to variations in fragment length**
+In addition to the simulated TF effect, two different fragment length distributions (**B**) were simulated by differential sampling of the fragments for the different samples according to the scheme in **A**. The results of the different methods are shown in **C**.
+
+
+\newpage
+
+
+# `r getFigNb(TRUE)`
+
+
+```{r, eval=FALSE}
+fragDat <- readRDS("sim_frag_data.rds")
+fragDat[,gc:=fifelse(fld=="NF-enriched", "strong", "baseline")]
+fragDat$gc <- factor(fragDat$gc, 
+                       levels=c("baseline", "strong"), ordered=TRUE)
+
+gcDist <- ggplot(fragDat, aes(x=gc_content, color=gc))+
+geom_density(alpha=0.7, lwd=2)+
+scale_color_manual(values=c("#fa8d24f9", "#952758ff"))+
+xlab("Fragment GC content")+
+guides(color = guide_legend(title = "GC design"))+
+theme_bw()+
+theme(legend.title = element_blank(),
+      legend.position = "bottom")
+```
+
+
+```{r, eval=FALSE}
+rawFiles <- list.files("./data/sim_data_gc", recursive=TRUE, full.names=TRUE)
+rawFiles <- rawFiles[grepl("with_pvalues", rawFiles)]
+res <- lapply(rawFiles, readRDS)
+res <- lapply(res, as.data.table, keep.rownames=TRUE)
+names(res) <- rawFiles
+                    
+res <- rbindlist(res, idcol="folder", use.names=TRUE, fill=TRUE)
+res[,setting:=tstrsplit(folder, split="/", keep=4)]
+res[,c("tf", "paradigm", "es", "gc_1", "gc_2"):=tstrsplit(setting, keep=c(1:3,5,6), split="_")]
+res[,gc:=paste(gc_1, gc_2, sep="_")]
+
+res[,method:=tstrsplit(folder, keep=7, split="/")]
+res[,method:=tstrsplit(method, keep=1, split=".", fixed=TRUE)]
+
+# rename GC types
+res[,gc:=fifelse(gc=="all_baseline", "all baseline", gc)]
+res[,gc:=fifelse(gc=="all_strong", "all strong", gc)]
+res[,gc:=fifelse(gc=="group_NA", "grouped", gc)]
+res[,gc:=fifelse(gc=="intermediate_1", "intermediate 1", gc)]
+res[,gc:=fifelse(gc=="intermediate_2", "intermediate 2", gc)]
+res$gc <- factor(res$gc, levels=c("all baseline", "all strong", 
+                                  "intermediate 1", "intermediate 2",
+                                  "grouped"))
+
+# relcalculate ranks
+res[,rank:=order(p, -abs(logFC)), by=c("tf", "paradigm", "es", "method", "gc")]
+res <- subset(res, rn %in% c("CEBPB", "MAZ", "ZNF143", "ZN143", "CTCF"))
+res <- subset(res, rn==tf | c(rn=="ZN143" & tf=="ZNF143"))
+res[,is_sig:=padj<=0.05]
+res <- renameMethods(res)
+
+gcLines <- ggplot(res, aes(x=es, y=rank, group=gc, color=gc)) +
+geom_line(alpha=0.5, lwd=0.7)+
+geom_point(aes(size=is_sig), alpha=0.5)+
+scale_color_manual(values=cbbPalette, name="GC design")+
+scale_size_manual(values=c(2.5, 5), name="significant")+
+xlab("Effect Strength")+
+ylab("Rank of true TF")+
+facet_nested(paradigm+tf~method, scales="free")+
+scale_y_continuous(trans="log1p", breaks=c(500,200,100,50,10,5))+
+theme_bw()+
+theme(legend.position="bottom")
+gcLines
+ggsave("gc_perform_lines.png", units="cm", width=35, height=20)
+
+gcHm <- ggplot(res, aes(y=method, x=es, color=rank))+
+geom_point(aes(size=is_sig))+
+facet_nested(paradigm+tf~ gc, scales="free", switch="y")+
+scale_color_gradientn(trans = "sqrt",
+                      breaks=c(500,200,100,50,10),
+                      colours=viridis(length(unique(res$rank)), 
+                                    direction=-1, end=0.95), # easier to see than the very bright yellow
+                     #direction=-1,
+                     name="Rank of true TF")+
+scale_size_manual(values=c(4,8), name="significant")+
+scale_y_discrete(position="right")+
+theme_bw()+
+theme(legend.position="bottom",
+      legend.key.width = unit(1, "cm"),
+      axis.title.x=element_blank(),
+      axis.title.y=element_blank(),
+      legend.justification="center")
+
+img <- my_image <- readPNG("variations_gc.png", native = TRUE)
+ovFig1 <- ggplot() + 
+  scale_x_continuous(expand=c(0,0)) +
+  scale_y_continuous(expand=c(0,0)) +
+  theme_void() + annotation_custom(grid::rasterGrob(img), 
+                    xmin = -Inf, ymin = -Inf, xmax = Inf, ymax = Inf)+
+  theme(panel.background = element_rect(fill = "transparent", colour = NA),
+    plot.background = element_rect(fill = "transparent", colour = NA),
+    panel.grid = element_blank(),
+    panel.border = element_blank(),
+    plot.margin = unit(c(-1.25, 1,-1.25,-1.25), "lines"),
+    panel.margin = unit(c(0,0,0,0), "lines"),
+    axis.ticks = element_blank(),
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    axis.line = element_blank(),
+    legend.position = "none",
+    axis.ticks.length = unit(0, "null"),
+    axis.ticks.margin = unit(0, "null"),
+    legend.margin = unit(0, "null"))
+ovFig1
+```
+
+
+```{r, fig.width=12, fig.height=12, eval=FALSE}
+(ovFig1 + gcDist + gcHm) + plot_annotation(tag_levels=list(c("A", "B", "C")))+
+  plot_layout(widths = c(1.5, 1.5), heights=c(1,3), design="
+              12
+              33") & # design=layout
+  theme(plot.tag=element_text(face="bold", size=18))
+# ggsave("sim_s8.png", units="cm", 
+#        width=30, height=30)
+# 
+# (ovFig1 + gcDist + gcLines) + plot_annotation(tag_levels=list(c("A", "B", "C")))+
+#   plot_layout(widths = c(1, 1.5), heights=c(1,3), design="
+#               12
+#               33") & # design=layout
+#   theme(plot.tag=element_text(face="bold", size=18))
+# ggsave("sim_s7_alt.png", units="cm", 
+#        width=30, height=30)
+```
+
+```{r, fig.width=19, fig.height=20}
+# TEMPORARY FIX SINCE I CAN'T FIND THE FILES...
+plot_grid(
+  ggdraw() + draw_image("simS7_gc.png")
+)
+```
+
+**`r getFigNb()` : Robustness to variations in GC bias**
+In addition to the simulated TF effect, two different GC biases (**B**) were simulated by differential sampling of the fragments for the different samples according to the scheme in **A**. The results of the different methods are shown in **C**.
+

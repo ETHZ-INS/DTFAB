@@ -2,7 +2,6 @@
 title: "On the identification of differentially-active transcription fators from ATAC-seq data"
 subtitle: "Supplementary Figures"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
-author: Pierre-Luc Germain
 output:
   pdf_document:
     fig_width: 8
@@ -425,9 +424,14 @@ lower or equal to the observed one.
 
 
 
+\newpage
+
+```{r, child="../simulations/sfig_sim.Rmd"}
+```
 
 
 
+# `r getFigNb(TRUE)`
 
 ```{r, fig.width=4, fig.height=7}
 densities <- data.frame(sample=c("NFKB.1","NFKB.2","Scrambled.1","Scrambled.1","DMSO"),
@@ -446,3 +450,7 @@ plot_grid( ggdraw() + draw_image("traftac_WB.png") + coord_cartesian(expand=0),
            pd, nrow=2, labels="AUTO")
 ```
 
+
+**`r getFigNb()` : Western blot confirms the downregulation of p50/NfKB.**
+Western blot (**A**) and corresponding densitometry showing a downregulation of 
+p50/NFkB in HEK cells treated with NFkB TRAFTACs versus scrambled TRAFTACs.
