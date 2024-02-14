@@ -40,6 +40,7 @@ saveRDS(se, "peakCounts.SE.rds")
 
 motifs <- getNonRedundantMotifs(species="Hsapiens")
 moi <- motifmatchr::matchMotifs(motifs, subject=se, genome=genome)
+saveRDS(moi, "motifMatches.rds")
 set.seed(1234)
 dev <- chromVAR::computeDeviations(object=se, annotations=moi,
                                    background_peaks=getBackgroundPeaks(se, niterations=2000))
@@ -232,6 +233,75 @@ draw(
                        width=unit(0.7, "in"), row_names_gp=gpar(fontsize=9)),
   merge=TRUE)
 ```
+
+## smoothGC+mlm
+
+```{r}
+se <- readRDS("peakCounts.SE.rds")
+moi <- readRDS("motifMatches.rds")
+assays(se)$gcnorm <- GCSmoothQuantile(se, bio="condition")
+```
+
+```{r}
+#' mlmFast
+#'
+#' @param accmat A matrix of peak (rows) accessibility per sample/cell (columns)
+#' @param annotation A matrix of motif (columns) matches per peak (rows)
+#' @param useIntercept Logical; whether to use an intercept in the mode
+#' @param poisson Logical; whether to use poisson regression (assumes `accmat`
+#'   is a count matrix).
+#' @param BPPARAM BiocParallel param for multithreading.
+#'
+#' @return A matrix (of `ncol(annotation)` rows and `ncol(accmat)` columns) with
+#'   the activity scores (model t-values) of each motif in each sample.
+#'   
+#' @details 
+#' Regresses each column of `accmat` on `annotation`, and uses the coefficients'
+#' t-values as activity scores.
+#' 
+#' @export
+mlmFast <- function(accmat, annotation, useIntercept=TRUE, poisson=FALSE,
+                    BPPARAM=BiocParallel::SerialParam()){
+  stopifnot(is.matrix(accmat) && is.matrix(annotation))
+  if(useIntercept) annotation <- cbind(rep(1L,nrow(annotation)), annotation)
+  res <- bplapply(seq_len(ncol(accmat)), BPPARAM=BPPARAM, FUN=function(i){
+    if(!isTRUE(poisson)){
+      mod <- RcppArmadillo::fastLmPure(annotation, accmat[,i])
+      tvals <- mod$coefficients/mod$stderr
+    }else{
+      if(FALSE && require("Rfast", quietly=TRUE, include.only="glm_poisson")){
+        mod <- glm_poisson(a, y[,1], full=TRUE)$info
+      }else{
+        mod <- glm(accmat[,i]~0+annotation, family="poisson")
+        mod <- coef(summary(mod))
+      }
+      tvals <- mod[,1]/mod[,2]
+    }
+    tvals
+  })
+  res <- matrix(unlist(res), nrow=ncol(annotation))
+  row.names(res) <- colnames(annotation)
+  if(useIntercept) res <- res[-1,,drop=FALSE]
+  colnames(res) <- colnames(accmat)
+  res
+}
+```
+
+```{r}
+e <- mlmFast(assays(se)$gcnorm, as.matrix(assay(moi)), BPPARAM=MulticoreParam(4))
+mse <- SummarizedExperiment(list(lm=e), colData=colData(se))
+mm <- model.matrix(~se$condition)
+fit <- eBayes(lmFit(assay(mse), mm))
+res <- as.data.frame(topTable(fit, number=Inf))
+res$TF <- row.names(res)
+head(res)
+rowData(mse) <- res[row.names(mse),]
+rowData(mse)$meanAbsT <- rowMeans(abs(assay(mse)))
+saveRDS(mse,"gcnorm.mlm.SE.rds")
+sechm(mse, head(row.names(res),20), do.scale = TRUE, left_annotation="meanAbsT")
+```
+
+
 
 ## Checking the insertion profile of some candidates
 
