@@ -1,5 +1,5 @@
 ---
-title: "Figure 4"
+title: "Figure 5"
 date: "11/4/2023"
 output: html_document
 ---
@@ -111,14 +111,14 @@ p3b <- grid.grabExpr(draw(Reduce("+",hl), merge=FALSE), wrap.grobs=TRUE)
 ```
 
 
-```{r, fig.height=7, fig.width=8.5}
+```{r, fig.height=7.5, fig.width=8.5}
 pp <- plot_grid(
   plot_grid(p1,p2,nrow=1,labels="AUTO",scale=0.95),
   p3b,
-  nrow=2, rel_heights=c(5,4), labels=c(NA,"C")
+  nrow=2, rel_heights=c(5.2,4), labels=c(NA,"C")
 )
 pp
-pdf("Figure5.pdf", height=7, width=8.5)
+pdf("Figure5.pdf", height=7.5, width=8.5)
 pp
 dev.off()
 ```
