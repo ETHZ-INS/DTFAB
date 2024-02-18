@@ -2,6 +2,7 @@
 title: "On the identification of differentially-active transcription fators from ATAC-seq data"
 subtitle: "Supplementary Figures"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
+author: "Gerbaldo, Sonder et al."
 output:
   pdf_document:
     fig_width: 8
