@@ -1,3 +1,22 @@
+<!--
+---
+title: "Simulation supplementary figures"
+output:
+ pdf_document:
+   fig_width: 8
+   fig_height: 6
+---
+
+```{r setup, include=FALSE, eval=FALSE}
+knitr::opts_chunk$set(warning=FALSE, message=FALSE, echo=FALSE)
+FIG_NB <- 0
+FIG_STRING <- "Supplementary Figure "
+getFigNb <- function(increment=FALSE){
+  if(increment) FIG_NB <<- FIG_NB + 1
+  paste0(FIG_STRING,FIG_NB)
+}
+```
+-->
 
 ```{r packages2}
 suppressPackageStartupMessages({
@@ -35,16 +54,16 @@ cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73",
 
 ```{r, fig.width=20, fig.height=14}
 plot_grid(
-  ggdraw() + draw_image("Sfig_sim_overview.png")
+  ggdraw() + draw_image("Sfig_sim_overview2.png")
 )
 ```
 
 
 **`r getFigNb()` : Overview of the simulations. **
-6 baseline ATAC-seq lymphoblastoid cell lines (LCLs) are divided into two groups (**B**).
+6 baseline ATAC-seq lymphoblastoid cell lines (LCLs) are divided into two groups (**A**).
 ChIP-seq peaks of the factor of interest (in LCLs) are used to identify regions of the
 accessibility profile in which differences will be introduced through downsampling of
-the fragments in one of the groups (**A**). The extent of downsampling is based on the 
+the fragments in one of the groups (**B**). The extent of downsampling is based on the 
 enrichment over the input of the ChIP peak, following one of two differential activity
 scenarios: an activation and a haploinsufficiency (see following supplementary figure).
 The magnitude of the effect is further scaled up and down, and eventual per-sample GC
