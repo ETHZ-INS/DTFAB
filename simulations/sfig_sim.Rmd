@@ -787,26 +787,27 @@ rankHeatmap2 <- function(res, rankBreaks=c(1,10,30,75,150,300,600), ...,
      heatmap_legend_param=list(at=rev(sqrt(rankBreaks)),
                                labels=rev(c("top",rankBreaks[-1])),
                                break_dist=rev(bdist), legend_height=unit(3.5, "cm"),
-                               labels_gp=gpar(fontsize=9)))
+                               labels_gp=gpar(fontsize=9)), ...)
   
   if(!doDraw) return(h)
   draw(h, merge=TRUE)
 }
 ```
 
-```{r, fig.width=15, fig.height=12}
+```{r, fig.width=12, fig.height=8.5, warning=FALSE}
 res <- readRDS("res_all_effect_strength.rds")
 res <- as.data.table(res)
 res[,c("tf","paradigm","effect_strength"):=tstrsplit(dataset, split="_", keep=c(1,2,3))]
 
 res <- renameMethods(as.data.frame(res))
-h1 <- rankHeatmap2(copy(res), doDraw=FALSE, column_title="Rank of true TF", row_names_gp=gpar(fontsize=10))
+h1 <- rankHeatmap2(copy(res), doDraw=FALSE, column_title="Rank of true TF", row_names_gp=gpar(fontsize=10), row_title_gp=gpar(fontface="bold"))
 h2 <- relAUCplot2(copy(res), doDraw=FALSE, column_title="Network Score")
-h <- grid.grabExpr(draw(h1 + h2, merge=TRUE))
-fig <- cowplot::plot_grid(h)
-fig
+draw(h1 + h2, merge=TRUE, heatmap_legend_side="bottom", annotation_legend_side="bottom")
 ```
 
+
+**`r getFigNb()` : Heatmap of top methods performance on the semi-simulated datasets.**
+As in Main Fig 1, the left part of the heatmap shows the ranks, while the right part shows the corresponding network scores obtained on the simulated datasets.
 
 
 \newpage
