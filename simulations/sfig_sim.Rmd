@@ -287,26 +287,6 @@ theme(legend.position="none",
 rightP <- ((coRankSim/coRankGC/peakGCPlot)+plot_layout(heights=c(3,3,2), ncol=1)) & 
   theme(plot.tag = element_text(face="bold", size=16))
 plot_grid(motifPlot & theme(plot.tag = element_text(face="bold", size=16)), rightP, nrow=1, rel_widths=c(3,4))
-
-
-motifPlot + rightP
-
-layout <- "AAAAAAACCCCCCCCCC
-           AAAAAAACCCCCCCCCC
-           BBBBBB#DDDDDDDDDD
-           BBBBBB#DDDDDDDDDD
-           BBBBBB#EEEEEEEEEE
-           BBBBBB#EEEEEEEEEE"
-
-lfcDist+motifPlot+coRankSim+coRankGC+peakGCPlot+plot_layout(design=layout) & 
-  #plot_annotation(tag_levels=list(c("A", "B", "C", "D", "E"))) &
-  theme(plot.tag = element_text(face="bold", size=18),
-        strip.text=element_text(size=12),
-        axis.text=element_text(size=12),
-        axis.title=element_text(size=14),
-        legend.justification = "center",
-        legend.text = element_text(size=10),
-        legend.title = element_text(size=12))
 ```
 
 
