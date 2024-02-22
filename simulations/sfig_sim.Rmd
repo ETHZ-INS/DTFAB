@@ -101,7 +101,7 @@ scale_fill_viridis(option="D", end=0.95)+ # easier to see the white labels
 guides(fill = guide_legend(title = "Number of ChIP-peaks",
                            label.position = "bottom"))+
 scale_y_discrete(position="right")+
-labs(tag="B")+
+labs(tag="A")+
 theme_bw()+
 theme(axis.title.x = element_blank(),
       axis.title.y = element_blank(),
@@ -117,7 +117,7 @@ propDt[,variable:=as.character(variable)]
 propDt[, variable:=fifelse(variable=="motif_prop", 
                            "input ChIP-peaks", variable)]
 propDt[, variable:=fifelse(variable=="motif_prop_chip", 
-                           "ChIP-peaks overlaping ATAC-Peaks", variable)]
+                           "ChIP-peaks\noverlaping ATAC-peaks", variable)]
 propDt[, variable:=fifelse(variable=="motif_prop_atac", 
                            "ATAC-peaks", variable)]
 propDt[, variable:=fifelse(variable=="prop_atac_chip", 
@@ -139,7 +139,7 @@ enrPlot <- ggplot(enrSubDt, aes(y="Enrichment", x=tf, fill=enr))+
 geom_tile(alpha=0.85)+
 geom_text(aes(label=round(enr, 2)), color="white", fontface="bold")+
 scale_fill_viridis(option="D", end=0.95)+
-guides(fill = guide_legend(title = "Enrichment motifs ChIP- vs ATAC-peaks",
+guides(fill = guide_legend(title = "Enrichment of motifs\nin ChIP- vs ATAC-peaks",
                            label.position = "bottom"))+
 scale_y_discrete(position="right")+
 theme_bw()+
@@ -149,29 +149,6 @@ theme(axis.title.x = element_blank(),
 
 motifPlot <- nChIP / propFullPlot / enrPlot + plot_layout(heights = c(1, 4, 1))
 ```
-
-```{r, lfc}
-act <- readRDS("./data/activation.rds")
-hap <- readRDS("./data/haploinsufficiency.rds")
-act[,enr:=scale(enr)]
-act$type <- "activation"
-hap[,enr:=scale(enr)]
-hap$type <- "haploinsufficiency"
-
-lfc <- rbind(act, hap)
-
-lfcDist <- ggplot(lfc, aes(x=enr, y=lfc))+
-  facet_grid(cols=vars(type), scales="free")+
-  geom_pointdensity()+
-  geom_hline(yintercept=0, linetype="dashed")+
-  scale_color_viridis(option="A")+
-  ylab("Log fold change")+
-  xlab("Enrichment over input")+
-  labs(tag="A")+
-  theme_bw()+
-  theme(legend.position="bottom")
-```
-
 
 ```{r}
 # Rank plots Enrichment - simulated data
@@ -228,9 +205,9 @@ coRankSim <- ggplot(subset(freqAll, paradigm=="activation"), aes(x=percentile, y
                         colours=viridis(length(unique(freqAll$prop_co_peak))), 
                         name="Proportion of matches co-occuring with true motif")+
   facet_grid(cols=vars(tf))+
-  ylab("Enrichment of motif in ChIP-peaks")+
-  xlab("Percentile")+
-  labs(tag="C")+
+  ylab("Enrichment of motif\nin ChIP-peaks")+
+  xlab("Enrichment percentile")+
+  labs(tag="B")+
   theme_bw()+
   theme(legend.box.just="left",
         legend.position="bottom", 
@@ -252,10 +229,10 @@ coRankGC <- ggplot(subset(freqAll, paradigm=="activation"), aes(x=percentile, y=
                         colours=inferno(length(unique(freqAll$GC_content))), 
                         name="GC content")+
   facet_grid(cols=vars(tf))+
-  ylab("Enrichment of motif in ChIP-peaks")+
-  xlab("Percentile")+
+  ylab("Enrichment of motif\nin ChIP-peaks")+
+  xlab("Enrichment percentile")+
   scale_size(range=c(0,1))+
-  labs(tag="D")+
+  labs(tag="C")+
   theme_bw()+
   theme(legend.box.just = "left", 
         legend.margin = margin(l=0),
@@ -300,13 +277,20 @@ geom_vline(xintercept=0.5, linetype="dashed")+
 guides(fill = guide_legend(title="Transcription Factor"))+
 guides(color="none")+
 xlab("GC content ChIP-peaks")+
-labs(tag="E")+
+labs(tag="D")+
 theme_bw()+
 theme(legend.position="none",
       legend.margin=margin(l=0, r=0, t=0, b=0))
 ```
 
-```{r s2, fig.width=16, fig.height=12}
+```{r s2, fig.width=13, fig.height=10}
+rightP <- ((coRankSim/coRankGC/peakGCPlot)+plot_layout(heights=c(3,3,2), ncol=1)) & 
+  theme(plot.tag = element_text(face="bold", size=16))
+plot_grid(motifPlot & theme(plot.tag = element_text(face="bold", size=16)), rightP, nrow=1, rel_widths=c(3,4))
+
+
+motifPlot + rightP
+
 layout <- "AAAAAAACCCCCCCCCC
            AAAAAAACCCCCCCCCC
            BBBBBB#DDDDDDDDDD
@@ -327,10 +311,9 @@ lfcDist+motifPlot+coRankSim+coRankGC+peakGCPlot+plot_layout(design=layout) &
 
 
 **`r getFigNb()` : Overview of the simulated TFs and effect paradigms. **
-**A:** Relationship between log2FC and peak enrichment under the two simulation paradigms.
-**B:** Number of peaks, proportion of ChIP and/or ATAC peaks with a motif, and fold-enrichment of the ChIP-peaks for the motif across the four TFs.
-**C-D:** Enrichment of all tested motifs among the ChIP peaks (relative to ATAC peaks), with the true motif labeled in black. The dots are colored either by co-occurence with the true motif (**C**) or by GC content (**D**).
-**E:** GC content distributions of the ChIP-peaks of each TF.
+**A:** Number of peaks, proportion of ChIP and/or ATAC peaks with a motif, and fold-enrichment of the ChIP-peaks for the motif across the four TFs.
+**B-C:** Enrichment of all tested motifs among the ChIP peaks (relative to ATAC peaks), with the true motif labeled in black. The dots are colored either by co-occurence with the true motif (**B**) or by GC content (**C**).
+**D:** GC content distributions of the ChIP-peaks of each TF.
 
 
 \newpage
