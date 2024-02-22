@@ -6,9 +6,7 @@ output: html_document
 ```{r setup}
 library(ggplot2)
 library(cowplot)
-library(ComplexHeatmap)
 library(data.table)
-library(SummarizedExperiment)
 library(patchwork)
 library(RColorBrewer)
 library(ggpointdensity)
@@ -20,10 +18,8 @@ library(ggh4x)
 library(ggpubr)
 library(ggimage)
 library(stringr)
-library(BSgenome.Hsapiens.UCSC.hg38)
 library(png)
 
-BSgenome <- BSgenome.Hsapiens.UCSC.hg38
 
 source("../Scripts/plot.R")
 source("../Scripts/runMethods.R")
@@ -168,9 +164,9 @@ lfcDist <- ggplot(lfc, aes(x=enr, y=lfc))+
 ```
 
 
-```{r, fig.width=13.5, fig.height=18}
-pdf("Figure4.pdf", width=13.5, height=18)
+```{r, fig.width=13.5, fig.height=16}
+pdf("Figure4.pdf", width=13.5, height=16)
 ((scheme + free(lfcDist) + plot_layout(widths=c(4,3.3))) / es_perform) + 
-  plot_layout(heights = c(1,3))
+  plot_layout(heights = c(1.2,3))
 dev.off()
 ```
