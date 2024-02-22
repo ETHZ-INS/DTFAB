@@ -290,7 +290,7 @@ plot_grid(motifPlot & theme(plot.tag = element_text(face="bold", size=16)), righ
 ```
 
 
-**`r getFigNb()` : Overview of the simulated TFs and effect paradigms. **
+**`r getFigNb()` : Overview of the simulated TFs.**
 **A:** Number of peaks, proportion of ChIP and/or ATAC peaks with a motif, and fold-enrichment of the ChIP-peaks for the motif across the four TFs.
 **B-C:** Enrichment of all tested motifs among the ChIP peaks (relative to ATAC peaks), with the true motif labeled in black. The dots are colored either by co-occurence with the true motif (**B**) or by GC content (**C**).
 **D:** GC content distributions of the ChIP-peaks of each TF.
