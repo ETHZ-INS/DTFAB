@@ -94,7 +94,7 @@ scale_color_viridis(option="D", direction=-1, name="adjusted p-value  ")+
 scale_size_manual(values = c("TRUE"=4.2, "FALSE"=4.2),
                   name="significant")+
 guides(size=guide_legend(override.aes = list(fontface=c(1, 2))))+ # label=c("FALSE", "TRUE")
-xlab("Effect Strength")+
+xlab("Pertubation Strength")+
 ylab("Rank of True motif")+
 ggtitle("Activation")+
 labs(tag = "C")+
@@ -120,7 +120,7 @@ scale_color_viridis(option="D", direction=-1, name="adjusted p-value  ")+
 scale_size_manual(values = c("TRUE"=4.2, "FALSE"=4.2),
                   name="significant")+
 guides(size=guide_legend(override.aes = list(fontface=c(1, 2))))+ # label=c("FALSE", "TRUE")
-xlab("Effect Strength")+
+xlab("Pertubation Strength")+
 ylab("Rank of True motif")+
 ggtitle("Haploinsufficiency")+
 scale_y_sqrt()+

@@ -34,20 +34,13 @@ cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73",
 
 ```{r, fig.width=20, fig.height=14}
 plot_grid(
-  ggdraw() + draw_image("Sfig_sim_overview2.png")
+  ggdraw() + draw_image("Sfig_sim_overview.png")
 )
 ```
 
 
-**`r getFigNb()` : Overview of the simulations. **
-6 baseline ATAC-seq lymphoblastoid cell lines (LCLs) are divided into two groups (**A**).
-ChIP-seq peaks of the factor of interest (in LCLs) are used to identify regions of the
-accessibility profile in which differences will be introduced through downsampling of
-the fragments in one of the groups (**B**). The extent of downsampling is based on the 
-enrichment over the input of the ChIP peak, following one of two differential activity
-scenarios: an activation and a haploinsufficiency (see following supplementary figure).
-The magnitude of the effect is further scaled up and down, and eventual per-sample GC
-and fragment length biases are introduced (**C**).
+**`r getFigNb()` : Overview of the semi-simulations. **
+**A:** 6 baseline ATAC-seq lymphoblastoid cell lines (LCLs) are divided into two groups. Differences will be introduced through downsampling of fragments in one of the groups, and eventual per-sample GC and fragment length biases are introduced. **B:** The extent of downsampling is based on the enrichment over the input of the ChIP-seq peak, following one of two differential activity scenarios: an activation and a haploinsufficiency (see Figure 4B). The magnitude of the effect is further scaled up and down (perturbation strength). **C.** Settings used for the semi-simulated datasets. The resulting datasets can be divided into three groups, a first set where only the strength of the perturbation was varied by a factor (perturbation strength), a second and third one were additionally differences in respectively fragment length distribution and GC were introduced across samples.
 
 \newpage
 
@@ -291,9 +284,7 @@ plot_grid(motifPlot & theme(plot.tag = element_text(face="bold", size=16)), righ
 
 
 **`r getFigNb()` : Overview of the simulated TFs.**
-**A:** Number of peaks, proportion of ChIP and/or ATAC peaks with a motif, and fold-enrichment of the ChIP-peaks for the motif across the four TFs.
-**B-C:** Enrichment of all tested motifs among the ChIP peaks (relative to ATAC peaks), with the true motif labeled in black. The dots are colored either by co-occurence with the true motif (**B**) or by GC content (**C**).
-**D:** GC content distributions of the ChIP-peaks of each TF.
+**A:** Number of peaks, proportion of ChIP-seq and/or ATAC-seq peaks with a motif, and fold-enrichment of the ChIP-seq peaks for the motif across the four TFs. **B-C:** Log2 fold-enrichment of all tested motifs among the ChIP-seq peaks (relative to ATAC-seq peaks), with the true motif labeled in black. The dots are colored either by co-occurence with the true motif (**B**) or by GC content (**C**). **D:** GC content distributions of the ChIP-seq peaks of each TF.
 
 
 \newpage
@@ -346,9 +337,8 @@ meanVarPlot <- ggplot(meanCounts, aes(x=log10(mean), y=log10(var)))+
 
 
 
-**`r getFigNb()` : Distributions of read counts and variance of the simulations**
-**A:** Peaks read count distributions of the original (denoted "0") and simulated samples with 1-fold and 3-fold effect sizes, for an example TF across both paradigms.
-**B:** Mean-variance relationship of the original (denoted "0") and simulated samples.
+**`r getFigNb()` : Distributions of fragment counts and variance of the simulations**
+**A:** Per peak fragment count distributions of the original (denoted ”0”) and simulated samples with 1-fold and 3-fold perturbation strengths, for an example TF (CEBPB) across both paradigms. **B:** Mean-variance relationship of the original (denoted "0") and simulated samples.
 
 
 \newpage
@@ -384,6 +374,9 @@ if(!file.exists("MAdat.subsampled.rds")){
 ```{r}
 colsChIP <- c(cbbPalette[2], cbbPalette[3])
 names(colsChIP) <- c("no overlap", "overlaps ChIP-peak")
+meanCounts[,overlaps_chip:=fifelse(overlaps_chip!="no overlap", 
+                                   "overlaps ChIP-peak",
+                                    as.character(overlaps_chip))]
 meanCounts$overlaps_chip <- factor(meanCounts$overlaps_chip, 
                                   levels=c("no overlap", "overlaps ChIP-peak"),
                                     ordered=TRUE)
@@ -450,8 +443,8 @@ ovChIP / ovMotif
 ```
 
 
-**`r getFigNb()` : MA plots showing the simulated effects**
-For each factor, simulated paradigm and effect strength, the distribution of peaks logFC between conditions as a function of mean accessibility is plotted, separating either (**A**) ATAC peaks overlapping a ChIP peak or not, or (**B**) ATAC peaks overlapping or not a motif for the TF. For visibility, the two sets of peaks were subsampled to a more comparable size.
+**`r getFigNb()` : MA plots of the simulated effects**
+For each factor, simulated paradigm and perturbation strength, the distribution of peaks log2FC of raw fragment counts between conditions as a function of mean accessibility is plotted as 2d kernel density, separating either (**A**) ATAC-seq peaks overlapping a ChIP-seq peak or not, or (**B**) ATAC-seq peaks containing a motif or not for the TF. For visibility, the peaks were subsampled to a more comparable size across the simulated datasets (10^5 peaks per dataset). Colored Points indicate the means of the respective distributions.
 
 
 \newpage
@@ -578,7 +571,7 @@ scale_size_manual(values=c("TRUE"=4.2, "FALSE"=4.2), name="significant")+
 guides(size=guide_legend(override.aes = list(fontface=c(1, 2))))+
 facet_grid(rows=vars(tf), cols=vars(method), scales="free")+
 scale_color_viridis(option="D", direction=-1, name="adjusted p-value")+
-xlab("Effect Strength")+
+xlab("Pertubation Strength")+
 ylab("Rank of true TF")+
 ggtitle("Activation")+
 scale_y_sqrt()+
@@ -603,7 +596,7 @@ scale_size_manual(values=c("TRUE"=4.2, "FALSE"=4.2), name="significant")+
 guides(size=guide_legend(override.aes = list(fontface=c(1, 2))))+
 facet_grid(rows=vars(tf), cols=vars(method), scales="free")+
 scale_color_viridis(option="D", direction=-1, name="adjusted p-value")+
-xlab("Effect Strength")+
+xlab("Pertubation Strength")+
 ylab("Rank of true TF")+
 ggtitle("Haploinsufficiency")+
 scale_y_sqrt()+
@@ -620,7 +613,7 @@ theme(legend.position="bottom",
 ```
 
 **`r getFigNb()` : Positive control of the simulations**
-Shown are rank and significance assigned by each method to the true motif across simulations parameters (TF, paradigm and effect strength). In light gray are the normal simulations, while the dark represent positive controls where a difference between the groups was only introduced in the peaks overlapping a motif match.
+Shown are ranks and significance assigned by each method to the true motif across simulation parameters (TF, paradigm and perturbation strength). In light gray are the normal simulations (as shown in main Fig 4), while dark line and colored boxes correspond to the positive controls where a difference between the groups was only introduced in the peaks overlapping a motif of the true TF. 
 
 
 \newpage
@@ -806,9 +799,8 @@ draw(h1 + h2, merge=TRUE, heatmap_legend_side="bottom", annotation_legend_side="
 ```
 
 
-**`r getFigNb()` : Heatmap of top methods performance on the semi-simulated datasets.**
-As in Main Fig 1, the left part of the heatmap shows the ranks, while the right part shows the corresponding network scores obtained on the simulated datasets.
-
+**`r getFigNb()` : Heatmap of performance of variants of top methods on the semi-simulated datasets.**
+As in main Fig 1, the left part of the heatmap shows the ranks, while the right part shows the corresponding network scores obtained on the simulated datasets.
 
 \newpage
 
@@ -817,24 +809,26 @@ As in Main Fig 1, the left part of the heatmap shows the ranks, while the right 
 
 ```{r, eval=TRUE}
 # FLD
-if(!file.exists("sim_fld.rds")){
+if(!file.exists("sim_frag_data_fld.rds")){
   simfrags <- readRDS("./data/sim_data_fld/MAZ_activation_0_FALSE_group/seq_files/simfrags.rds")
   simFrags <- simfrags$sim
   simFrags[,fld:=fifelse(group=="group1", "NF-enriched", "Mono-enriched")]
   simFrags$fld <- factor(simFrags$fld, 
                          levels=c("NF-enriched", "Mono-enriched"), ordered=TRUE)
   fragDat <- simFrags[which(simFrags$sample %in% c("group1_1","group2_1")), c("fld","width","gc_content")]
-  saveRDS(fragDat, "sim_frag_data.rds")
+  saveRDS(fragDat, "sim_frag_data_fld.rds")
 }else{
-  fragDat <- readRDS("sim_frag_data.rds")
+  fragDat <- readRDS("sim_frag_data_fld.rds")
 }
 
-fldDist <- ggplot(fragDat, aes(x=width, color=fld))+
-geom_density(alpha=0.7, lwd=2)+
+fldDist <- ggplot(fragDat, aes(x=width, color=fld, fill=fld))+
+geom_density(alpha=0.7, lwd=1.5)+
 scale_color_manual(values=c("#b8db52fd", "#4d9d89fd"))+
+scale_fill_manual(values=c("#b8db52fd", "#4d9d89fd"))+
 xlab("Fragment Length")+
-guides(color = guide_legend(title = "Fragment length distributions"))+
-xlim(c(0,1000))+
+guides(color=guide_legend(title = "Fragment length distributions"),
+       fill="none")+
+xlim(c(0,750))+
 theme_bw()+
 theme(legend.title = element_blank(),
       legend.position = "bottom",
@@ -868,55 +862,11 @@ res[,fld:=fifelse(fld=="group_NA", "grouped", fld)]
 res[,fld:=fifelse(fld=="mono_enriched", "All Mononucleosome enriched", fld)]
 res[,fld:=fifelse(fld=="nf_enriched", "All Nucleosome-free enriched", fld)]
 
-hap <- ggplot(subset(res, paradigm=="haploinsufficiency"), 
-              aes(x=es, y=rank, group=fld, color=fld)) +
-geom_line()+
-geom_text_repel(aes(label=rank), 
-                direction="y", size=2.5, segment.color = NA, nudge_y=10)+
-geom_point(aes(size=is_sig))+
-scale_size_manual(values=c(2.5, 5), name="significant")+
-scale_color_manual(values=cbbPalette, name="FLD type")+
-xlab("Effect Strength")+
-ggtitle("Haploinsufficiency")+
-facet_grid(rows=vars(tf), cols=vars(method), scales="free")+
-scale_y_sqrt()+
-theme_bw()+
-theme(legend.position="bottom")
-
-act <- ggplot(subset(res, paradigm=="activation"), 
-              aes(x=es, y=rank, group=fld, color=fld)) +
-geom_line()+
-geom_text_repel(aes(label=rank), direction="y", size=2.5, segment.color = NA, nudge_y=10)+
-geom_point(aes(size=is_sig))+
-scale_color_manual(values=cbbPalette, name="FLD type")+
-scale_size_manual(values=c(2.5, 5), name="significant")+
-xlab("Effect Strength")+
-ggtitle("Activation")+
-facet_grid(rows=vars(tf), cols=vars(method), scales="free")+
-scale_y_sqrt()+
-theme_bw()+
-theme(legend.position="bottom")
-# 
-# (act / hap) + plot_annotation(tag_levels=list(c("A", "B")))+
-#   plot_layout(guides = "collect") &
-#   theme(plot.tag = element_text(face="bold", size=18), legend.position="bottom")
-
-fldLines <- ggplot(res, aes(x=es, y=rank, group=fld, color=fld)) +
-geom_line(alpha=0.5, lwd=0.7)+
-geom_point(aes(size=is_sig), alpha=0.5)+
-scale_color_manual(values=cbbPalette, name="FLD design")+
-scale_size_manual(values=c(2.5, 5), name="significant")+
-ylab("Rank of true TF")+
-xlab("Effect Strength")+
-facet_nested(paradigm+tf~method, scales="free")+
-scale_y_continuous(trans="log1p", breaks=c(500,200,100,50,10))+
-theme_bw()+
-theme(legend.position="bottom", legend.justification="left")
-ggsave("fld_perform_lines_alt.png", units="cm", width=35, height=20)
-
+# performance plot
 fldHm <- ggplot(res, aes(y=method, x=es, color=rank))+
 geom_point(aes(size=is_sig))+
 facet_nested(paradigm+tf~ fld, scales="free", switch="y")+
+#geom_text(aes(label=rank), fontface="bold", color="black")+
 #scale_color_viridis(option="D", direction=-1,
 #                    name="Rank of true TF",
 #                    end=0.9)+ # easier to see than the very bright yellow
@@ -978,22 +928,10 @@ fldPlot <- (ovFig1 + fldDist + fldHm) +
               33") & # design=layout
   theme(plot.tag=element_text(face="bold", size=18))
 fldPlot
-# ggsave("sim_s6.png", units="cm", 
-#        width=30, height=30)
-# 
-# (ovFig1 + fldDist + fldLines) + 
-#   plot_annotation(tag_levels=list(c("A", "B", "C")))+
-#   plot_layout(widths = c(1, 1.5), heights=c(1,3), design="
-#               12
-#               33") & # design=layout
-#   theme(plot.tag=element_text(face="bold", size=18))
-# ggsave("sim_s6_alt.png", units="cm", 
-#        width=40, height=30)
 ```
 
-**`r getFigNb()` : Robustness to variations in fragment length**
-In addition to the simulated TF effect, two different fragment length distributions (**B**) were simulated by differential sampling of the fragments for the different samples according to the scheme in **A**. The results of the different methods are shown in **C**.
-
+**`r getFigNb()` : Robustness to simulated variations in fragment length.**
+In addition to the simulated TF effect, two different fragment length distributions (**B**) were simulated by differential sampling of the fragments according to their length for the different samples as in scheme **A**. The distribution in light green corresponds to sampling mononucleosome containing fragments with higher probability, whereas for the distribution in dark green nucleosome-free fragments were sampled preferentially. The results of the methods are shown in **C**. Colors of the points correspond to the rank of the true TF obtained, point size if the corresponding adjusted p-value was found to be significant (adjusted p-value <= 0.05). 
 
 \newpage
 
@@ -1001,24 +939,33 @@ In addition to the simulated TF effect, two different fragment length distributi
 # `r getFigNb(TRUE)`
 
 
-```{r, eval=FALSE}
-fragDat <- readRDS("sim_frag_data.rds")
-fragDat[,gc:=fifelse(fld=="NF-enriched", "strong", "baseline")]
-fragDat$gc <- factor(fragDat$gc, 
-                       levels=c("baseline", "strong"), ordered=TRUE)
+```{r}
+if(!file.exists("sim_frag_data_gc.rds")){
+  simfrags <- readRDS("./data/sim_data_gc/MAZ_activation_0_FALSE_group/seq_files/simfrags.rds")
+  simFrags <- simfrags$sim
+  simFrags[,gc:=fifelse(group=="group1", "strong", "baseline")]
+  simFrags$fld <- factor(simFrags$gc, 
+                         levels=c("baseline", "strong"), ordered=TRUE)
+  fragDat <- simFrags[which(simFrags$sample %in% c("group1_1","group2_1")), c("gc","width","gc_content")]
+  saveRDS(fragDat, "sim_frag_data_gc.rds")
+}else{
+  fragDat <- readRDS("sim_frag_data_gc.rds")
+}
 
-gcDist <- ggplot(fragDat, aes(x=gc_content, color=gc))+
-geom_density(alpha=0.7, lwd=2)+
+gcDist <- ggplot(fragDat, aes(x=gc_content, color=gc, fill=gc))+
+geom_density(alpha=0.7, lwd=1.5)+
 scale_color_manual(values=c("#fa8d24f9", "#952758ff"))+
-xlab("Fragment GC content")+
-guides(color = guide_legend(title = "GC design"))+
+scale_fill_manual(values=c("#fa8d24f9", "#952758ff"))+
+xlab("GC content")+
+guides(color=guide_legend(title="GC design"),
+       fill="none")+
 theme_bw()+
 theme(legend.title = element_blank(),
       legend.position = "bottom")
 ```
 
 
-```{r, eval=FALSE}
+```{r}
 rawFiles <- list.files("./data/sim_data_gc", recursive=TRUE, full.names=TRUE)
 rawFiles <- rawFiles[grepl("with_pvalues", rawFiles)]
 res <- lapply(rawFiles, readRDS)
@@ -1050,20 +997,6 @@ res <- subset(res, rn==tf | c(rn=="ZN143" & tf=="ZNF143"))
 res[,is_sig:=padj<=0.05]
 res <- renameMethods(res)
 
-gcLines <- ggplot(res, aes(x=es, y=rank, group=gc, color=gc)) +
-geom_line(alpha=0.5, lwd=0.7)+
-geom_point(aes(size=is_sig), alpha=0.5)+
-scale_color_manual(values=cbbPalette, name="GC design")+
-scale_size_manual(values=c(2.5, 5), name="significant")+
-xlab("Effect Strength")+
-ylab("Rank of true TF")+
-facet_nested(paradigm+tf~method, scales="free")+
-scale_y_continuous(trans="log1p", breaks=c(500,200,100,50,10,5))+
-theme_bw()+
-theme(legend.position="bottom")
-gcLines
-ggsave("gc_perform_lines.png", units="cm", width=35, height=20)
-
 gcHm <- ggplot(res, aes(y=method, x=es, color=rank))+
 geom_point(aes(size=is_sig))+
 facet_nested(paradigm+tf~ gc, scales="free", switch="y")+
@@ -1073,6 +1006,7 @@ scale_color_gradientn(trans = "sqrt",
                                     direction=-1, end=0.95), # easier to see than the very bright yellow
                      #direction=-1,
                      name="Rank of true TF")+
+#geom_text(aes(label=rank), fontface="bold", color="black")+
 scale_size_manual(values=c(4,8), name="significant")+
 scale_y_discrete(position="right")+
 theme_bw()+
@@ -1102,35 +1036,109 @@ ovFig1 <- ggplot() +
     axis.ticks.length = unit(0, "null"),
     axis.ticks.margin = unit(0, "null"),
     legend.margin = unit(0, "null"))
-ovFig1
 ```
 
 
-```{r, fig.width=12, fig.height=12, eval=FALSE}
-(ovFig1 + gcDist + gcHm) + plot_annotation(tag_levels=list(c("A", "B", "C")))+
+```{r, fig.width=12, fig.height=12}
+gcPlot <- (ovFig1 + gcDist + gcHm) + plot_annotation(tag_levels=list(c("A", "B", "C")))+
   plot_layout(widths = c(1.5, 1.5), heights=c(1,3), design="
               12
-              33") & # design=layout
+              33") &
   theme(plot.tag=element_text(face="bold", size=18))
-# ggsave("sim_s8.png", units="cm", 
-#        width=30, height=30)
-# 
-# (ovFig1 + gcDist + gcLines) + plot_annotation(tag_levels=list(c("A", "B", "C")))+
-#   plot_layout(widths = c(1, 1.5), heights=c(1,3), design="
-#               12
-#               33") & # design=layout
-#   theme(plot.tag=element_text(face="bold", size=18))
-# ggsave("sim_s7_alt.png", units="cm", 
-#        width=30, height=30)
+gcPlot
 ```
 
-```{r, fig.width=19, fig.height=20}
-# TEMPORARY FIX SINCE I CAN'T FIND THE FILES...
-plot_grid(
-  ggdraw() + draw_image("simS7_gc.png")
-)
+**`r getFigNb()` : Robustness to simulated variations in GC content.**
+In addition to the simulated TF effect, two different GC content distributions (**B**) were simulated by differential sampling of the fragments according to their GC content for the different samples as in scheme **A**. The results of the methods are shown in **C**. Colors of the points correspond to the rank of the true TF obtained, point size if the corresponding adjusted p-value was found to be significant (adjusted p-value <= 0.05). 
+
+
+\newpage
+
+
+# `r getFigNb(TRUE)`
+
+```{r, fig.width=12, fig.height=8}
+res1 <- as.data.table(readRDS("../fullFrags/results.rds"))
+res1$type <- "real"
+res2 <- readRDS("../simulations/res_all_effect_strength.rds")
+res2 <- renameMethods(as.data.frame(res2))
+res2 <- as.data.table(res2)
+res2$type <- "sim"
+res2[,c("tf", "paradigm", "es"):=tstrsplit(dataset, split="_", keep=1:3)]
+res1 <- res1[which(res1$method %in% res2$method),]
+
+res <- rbind(res1, res2, use.names=TRUE, fill=TRUE)
+res$FDR[which(is.na(res$FDR))] <- 0
+res[,precision:=1-FDR]
+res[,is_sig:=trueQ<=0.05]
+
+# rename simulated datasets
+res[,dataset:=fifelse(type=="sim" & paradigm=="activation", 
+                      paste(tf, "activ.", sep="\n"), dataset)]
+res[,dataset:=fifelse(type=="sim" & paradigm=="haploinsufficiency", 
+                      paste(tf, "haplo.", sep="\n"), dataset)]
+
+res[,precision_color:=fifelse(precision<0.9, TRUE, FALSE)]
+
+# order methods
+orderMethods <- res[,.(mean_precision=mean(precision)), by=method]
+res$method <- factor(res$method,
+                     levels=orderMethods$method[order(orderMethods$mean_precision)],
+                     ordered=TRUE)
+
+# order datasets 
+orderDatasets <- res[,.(mean_precision=mean(precision)), by=dataset]
+res$dataset <- factor(res$dataset,
+                      levels=orderDatasets$dataset[order(orderDatasets$mean_precision)],
+                      ordered=TRUE)
+
+tlr <- ggplot(subset(res, type=="real"), 
+       aes(x=dataset, fill=precision, y=method))+
+      scale_fill_gradientn(trans = "sqrt",
+                           breaks=c(1.0,0.75,0.5,0.25,0.1,0),
+                           colours=viridis(20), 
+                           name="Precision")+
+      labs(tag="A")+
+      geom_tile()+
+      geom_text(aes(label=round(precision, 2), color=precision_color),
+                fontface="bold")+
+      scale_color_manual(values=c("TRUE"="white", "FALSE"="black"), 
+                         guide="none")+
+      scale_x_discrete(guide = guide_axis(n.dodge=2))+
+      theme_bw()+
+      theme(axis.text.y = element_text(size=12, color="black"),
+            axis.text.x = element_text(size=12, color="black"),
+            plot.tag=element_text(face="bold", size=18),
+            legend.position="right",
+            axis.title.x=element_blank())
+
+# tls 
+resAg <- subset(res, type=="sim")[,.(precision=mean(precision)), 
+                                  by=.(es, method)]
+resAg[,precision_color:=fifelse(precision<0.9, TRUE, FALSE)]
+tls <- ggplot(resAg, 
+       aes(x=es, fill=precision, y=method))+
+       scale_fill_gradientn(trans = "sqrt",
+                           breaks=c(1.0,0.75,0.5,0.25,0.1,0),
+                           colours=viridis(20), 
+                           name="Precision")+
+      geom_tile()+
+      geom_text(aes(label=round(precision, 2), color=precision_color), 
+                fontface="bold")+
+      scale_color_manual(values=c("TRUE"="white", "FALSE"="black"), 
+                         guide="none")+
+      #scale_x_discrete(guide = guide_axis(n.dodge=2))+
+      labs(tag="B")+
+      theme_bw()+
+      theme(axis.text.y = element_blank(),
+            axis.text.x = element_text(size=12, color="black", 
+                                       angle=90, hjust = 1, vjust=0.5),
+            plot.tag=element_text(face="bold", size=18),
+            legend.position="right",
+            axis.title=element_blank())
+
+tlr + tls + plot_layout(guides="collect")
 ```
 
-**`r getFigNb()` : Robustness to variations in GC bias**
-In addition to the simulated TF effect, two different GC biases (**B**) were simulated by differential sampling of the fragments for the different samples according to the scheme in **A**. The results of the different methods are shown in **C**.
-
+**`r getFigNb()` : Estimated precisions per dataset**
+**A:** Colored point map showing precision estimates obtained per dataset and method on the 11 real datasets, point sizes indicate if the true TF was found to be significant by the respective method. **B:** Heatmap showing the average precision and pertubation strength (across TFs and paradigms, no GC or FL biases included) and method.
