@@ -9,7 +9,6 @@ output: html_document
 library(Rsamtools)
 library(BiocParallel)
 library(GenomicAlignments)
-library(regioneR)
 library(BSgenome.Hsapiens.UCSC.hg38)
 library(MASS)
 library(mclust)
@@ -24,16 +23,13 @@ source("../Scripts/compileBenchmark.R")
 ```
 
 ```{bash engine.opts='-l', eval=FALSE}
-# GC biases were computed with 
-#cd ../fullFrags/ESR1/seqFiles
-#bedtools bamtobed -i CTRL3.bam > CTRL1.bed 
-# hg38Patch11.2bit from http://hgdownload.cse.ucsc.edu/gbdb/hg38/hg38.2bit
+# bedtools bamtobed -bedpe -i CTRL3.bam > CTRL3.bed 
 ```
 
 ```{r, paths, eval=TRUE}
 outDir <- "./data/sim_data_gc"
 bedBaseDir <- "./data/ATAC_beds"
-atacPeaksPath <- "/mnt/plger/esonder/R/tf_activity_benchmark/DTFAB/simulations/data/peaks/merged_peaks.narrowPeak"
+atacPeaksPath <- "./data/peaks/merged_peaks.narrowPeak"
 haploPath <- "./data/haploinsufficiency.rds"
 actPath <- "./data/activation.rds"
 genome <- BSgenome.Hsapiens.UCSC.hg38
@@ -53,9 +49,9 @@ ctcfPeaksDir <- "./data/ChIP_peaks/ENCFF592UDD_CTCF.bed.gz"
 ```{r, gc bins, eval=TRUE}
 # baseline gc content
 baseline <- fread("./data/ATAC_beds/ENCFF495DQP.bam_sorted.bed")
-baseline <- subset(baseline, V1=="chr1")
+baseline <- subset(baseline, V1 %in% paste0("chr", 1:22))
 baseline[,start:=pmin(V2, V5)]
-baseline[,end:=pmin(V3, V6)]
+baseline[,end:=pmax(V3, V6)]
 setnames(baseline, "V1", "chr")
 frags <- makeGRangesFromDataFrame(as.data.frame(baseline))
 seqlevelsStyle(frags) <- "UCSC"
@@ -63,7 +59,7 @@ frags$GC_content <- suppressWarnings(Repitools::gcContentCalc(frags, organism=ge
 fragsDt <- as.data.table(frags)
 
 fragsDt[,gc_bins:=cut(GC_content, 
-        breaks=seq(0,1, length.out=11), 
+        breaks=seq(0,1, length.out=100), 
         include.lowest=TRUE)]
 binDt <- fragsDt[,.(prob=.N/nrow(fragsDt)), by=gc_bins]
 setorder(binDt, gc_bins)
@@ -78,18 +74,21 @@ write.table(binDt,
 
 # strong(er) gc bias content
 # CTRL1 of ESR1 (CTRL1.bed)
-strong <- fread("../fullFrags/ESR1/seqFiles/CTRL1.bed")
-strong <- subset(strong, V1=="1")
+strong <- fread("../fullFrags/ESR1/seqFiles/CTRL3.bed")
+strong[,start:=pmin(V2, V5)]
+strong[,end:=pmax(V3, V6)]
 strong[,chr:=paste0("chr", V1)]
 strong$V1 <- strong$V4 <- NULL
-setnames(strong, c("V2", "V3"), c("start", "end"))
+strong <- strong[,c("chr","start", "end")]
+strong <- subset(strong, chr %in% paste0("chr", 1:22))
+
 frags <- makeGRangesFromDataFrame(as.data.frame(strong))
 seqlevelsStyle(frags) <- "UCSC"
 frags$GC_content <- suppressWarnings(Repitools::gcContentCalc(frags, organism=genome))
 fragsDt <- as.data.table(frags)
 
 fragsDt[,gc_bins:=cut(GC_content, 
-        breaks=seq(0,1, length.out=11), 
+        breaks=seq(0,1, length.out=100), 
         include.lowest=TRUE)]
 binDt <- fragsDt[,.(prob=.N/nrow(fragsDt)), by=gc_bins]
 setorder(binDt, gc_bins)
@@ -103,7 +102,7 @@ write.table(binDt,
             row.names=FALSE)
 ```
 
-```{r, plotting the gc biases}
+```{r, plotting the gc biases, eval=TRUE}
 # gc distributions files
 gcStrong <- "./data/gc_bias_files/strong.txt" # comes from CTRL3.bam of ESR1 experiment
 gcBaseline <- "./data/gc_bias_files/baseline.txt" # comes from 
@@ -131,7 +130,7 @@ simParams <- as.data.table(expand.grid(es=c(0, 1, 3),
                                                   "haploinsufficiency"),
                                        gc_setting=c("group",  # group (+,+,+ vs -,-,-)
                                                     "intermediate_1", # intermediate_1 (+,-,- vs -,-,-)
-                                                    "intermediate_2", # intermediate_2 (+,+,- vs -,+,-)
+                                                    #"intermediate_2", # intermediate_2 (+,+,- vs -,+,-)
                                                     "all_baseline", #all_baseline (-,-,- vs -,-,-)
                                                     "all_strong"))) # all_strong (+,+,+ vs +,+,+)
 # add varying of ATAC-peaks parameter in case of activation es: 0.5,1,3
@@ -157,7 +156,7 @@ paramsGroup2$name <- "group2"
 ```
 
 Simulate
-```{r, simulate, eval=FALSE}
+```{r, simulate, eval=TRUE}
 # run sequentially 
 lapply(1:nrow(simParams), function(i){
   
@@ -248,15 +247,6 @@ lapply(1:nrow(simParams), function(i){
   mergePeaksCommand <- "cat ../peaks/*narrowPeak | cut -f1-3 | sort -k1,1 -k2,2n | bedtools merge -i - > ../peaks/merged_peaks.bed"
   system(mergePeaksCommand)
   
-  # Filter to non-sex chromosomes
-  # peaks <- fread("../peaks/merged_peaks.narrowPeak")
-  # peaks <- subset(peaks, V1 %in% paste0("chr", 1:22))
-  # write.table(peaks,
-  #             "../peaks/sub_merged_peaks.narrowPeak",
-  #             quote=FALSE, col.names=FALSE,
-  #             sep="\t",
-  #             row.names=FALSE)
-
   setwd(wd)
   gc()
 })
