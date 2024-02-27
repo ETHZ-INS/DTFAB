@@ -1057,7 +1057,7 @@ In addition to the simulated TF effect, two different GC content distributions (
 
 # `r getFigNb(TRUE)`
 
-```{r, fig.width=12, fig.height=8}
+```{r, fig.width=11, fig.height=6}
 res1 <- as.data.table(readRDS("../fullFrags/results.rds"))
 res1$type <- "real"
 res2 <- readRDS("../simulations/res_all_effect_strength.rds")
@@ -1109,7 +1109,8 @@ tlr <- ggplot(subset(res, type=="real"),
       theme(axis.text.y = element_text(size=12, color="black"),
             axis.text.x = element_text(size=12, color="black"),
             plot.tag=element_text(face="bold", size=18),
-            legend.position="right",
+            legend.position="bottom",
+            axis.title.y=element_blank(),
             axis.title.x=element_blank())
 
 # tls 
@@ -1134,11 +1135,13 @@ tls <- ggplot(resAg,
             axis.text.x = element_text(size=12, color="black", 
                                        angle=90, hjust = 1, vjust=0.5),
             plot.tag=element_text(face="bold", size=18),
-            legend.position="right",
+            legend.position="bottom",
             axis.title=element_blank())
 
-tlr + tls + plot_layout(guides="collect")
+(tlr + ggtitle("Real datasets")) + (tls + ggtitle("Simulations")) + 
+  plot_layout(guides="collect", widths=c(4,2)) & 
+  theme(legend.position = "bottom", legend.key.width = unit(2,"cm"))
 ```
 
 **`r getFigNb()` : Estimated precisions per dataset**
-**A:** Colored point map showing precision estimates obtained per dataset and method on the 11 real datasets, point sizes indicate if the true TF was found to be significant by the respective method. **B:** Heatmap showing the average precision and pertubation strength (across TFs and paradigms, no GC or FL biases included) and method.
+Heatmap of precision estimates obtained per dataset and method on the 11 real datasets (**A**), as well as across each perturbation strength of the simulations (**B**).
