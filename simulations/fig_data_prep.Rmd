@@ -212,7 +212,6 @@ freqAll <- lapply(rawFiles, function(file){
   if(grepl("CEBPB", file)) peakRanges <- peakCEBPBRanges
 
   ovChip <- overlapsAny(rowRanges(se), peakRanges)
-  ovChip <- fifelse(ovChip, "overlaps ChIP", "no overlap")
 
   cm$peak_id <- 1:nrow(cm)
   cm$overlaps_chip <- ovChip
@@ -229,6 +228,7 @@ freqAll <- lapply(rawFiles, function(file){
   cmAll[,c("tf", "paradigm", "es", "varied_atac"):=tstrsplit(setting, split="_")]
   cmAll$setting <- NULL
   cmAll[,overlaps_chip_motif:=sum(overlaps_chip_motif)>0, by=.(peak_id, motif_id)]
+  cmAll[,overlaps_chip:=sum(overlaps_chip)>0, by=.(peak_id,motif_id)]
   cmAll[,tf:=fifelse(tf=="ZNF143", "ZN143", tf)]
   
   cmAll[,cont_tf:=sum(motif_id==tf)>0, by=.(peak_id)]
@@ -238,13 +238,14 @@ freqAll <- lapply(rawFiles, function(file){
   cmAll[,n_co_peak:=sum(cont_tf), by=.(motif_id)]
   
   freqDt <- cmAll[,.(n_chIP_motif=sum(overlaps_chip_motif), #sum(overlaps_chip=="overlaps ChIP")
+                     n_chIP=sum(overlaps_chip),
                      n_atac_only_motif=sum(!overlaps_chip_motif), #sum(overlaps_chip=="no overlap")
                      n_atac_motif_total=.N,
                      n_co_peak_chip=unique(n_co_peak_chip),
                      n_co_peak=unique(n_co_peak)), 
                   by=.(tf, motif_id, paradigm, es)]
   
-  freqDt$tot_chIP <- sum(ovChip=="overlaps ChIP")
+  freqDt$tot_chIP <- sum(ovChip)
   freqDt$tot_atac <- length(rowRanges(se))
 
   freqDt

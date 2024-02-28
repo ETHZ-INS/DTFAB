@@ -102,19 +102,22 @@ theme(axis.title.x = element_blank(),
 
 # rename variables
 propDt <- enrSubDt[,c("tf", "paradigm", "es", 
-                   "motif_prop_chip", "motif_prop_atac", 
-                   "motif_prop", "prop_atac_chip")]
+                   "motif_prop_chip", "motif_prop_atac", "motif_prop")]
 propDt <- melt(propDt, id.vars=c("tf", "paradigm", "es"), 
                value.name="proportion")
 propDt[,variable:=as.character(variable)]
 propDt[, variable:=fifelse(variable=="motif_prop", 
                            "input ChIP-peaks", variable)]
 propDt[, variable:=fifelse(variable=="motif_prop_chip", 
-                           "ChIP-peaks\noverlaping ATAC-peaks", variable)]
+                           "ATAC-peaks\noverlaping ChIP-peaks", variable)]
 propDt[, variable:=fifelse(variable=="motif_prop_atac", 
-                           "ATAC-peaks", variable)]
-propDt[, variable:=fifelse(variable=="prop_atac_chip", 
-                           "ChIP- vs ATAC-peaks", variable)]
+                           "All ATAC-peaks", variable)]
+propDt$variable <- factor(propDt$variable, 
+                          levels=c("All ATAC-peaks",
+                                   "ATAC-peaks \noverlapping ChIP-peaks",
+                                   "input ChIP-peaks"),
+                          ordered=TRUE)
+
 
 propFullPlot <- ggplot(propDt, aes(y=variable, x=tf, fill=proportion))+
 geom_tile(alpha=0.85)+
@@ -132,7 +135,7 @@ enrPlot <- ggplot(enrSubDt, aes(y="Enrichment", x=tf, fill=enr))+
 geom_tile(alpha=0.85)+
 geom_text(aes(label=round(enr, 2)), color="white", fontface="bold")+
 scale_fill_viridis(option="D", end=0.95)+
-guides(fill = guide_legend(title = "Enrichment of motifs\nin ChIP- vs ATAC-peaks",
+guides(fill = guide_legend(title = "Enrichment of motifs\nin ATAC-peaks overlapping ChIP-peaks",
                            label.position = "bottom"))+
 scale_y_discrete(position="right")+
 theme_bw()+
@@ -149,8 +152,8 @@ motifPlot <- nChIP / propFullPlot / enrPlot + plot_layout(heights = c(1, 4, 1))
 freqAll <- readRDS("freqAll.rds")  
 
 # Calculate enrichment
-freqAll[,prop_chIP:=n_chIP_motif/tot_chIP]
-freqAll[,prop_ATAC:=n_atac_only_motif/tot_atac]
+freqAll[,prop_chIP:=n_chIP/tot_chIP]
+freqAll[,prop_ATAC:=n_atac_motif_total/tot_atac]
 freqAll[,enr:=prop_chIP/prop_ATAC]
 freqAll[,prop:=n_chIP_motif/n_atac_motif_total]
 
@@ -176,7 +179,7 @@ freqTrueDt[,enr_diff:=enr-enr.y]
 freqTrueDt <- freqTrueDt[,c("enr", "rank", "enr_diff", "tf", "paradigm", 
                             "es", "percentile", "prop",
                             "prop_co_peak", "prop_co_peak_chip", "GC_content")]
-freqTop <- subset(freqAll, rank<=3)
+freqTop <- subset(freqAll, rank>=max(freqAll$rank)-2)
 
 # Rename ZN143
 freqAll[,tf:=fifelse(tf=="ZN143", "ZNF143", tf)]
@@ -184,12 +187,12 @@ freqTrueDt[,tf:=fifelse(tf=="ZN143", "ZNF143", tf)]
 freqTop[,tf:=fifelse(tf=="ZN143", "ZNF143", tf)]
 
 coRankSim <- ggplot(subset(freqAll, paradigm=="activation"), aes(x=percentile, y=enr))+
-  geom_label_repel(subset(freqTop, paradigm=="activation" & motif_id!="CTCF"), 
+  geom_label_repel(subset(freqTop, paradigm=="activation" & !(motif_id %in% c("CTCF", "CEBPB"))), 
              mapping=aes(x=percentile, y=enr, label=motif_id), 
              alpha=1, color="grey", nudge_x=-0.3, nudge_y=0.3)+
   geom_label_repel(subset(freqTrueDt, paradigm=="activation"), 
              mapping=aes(x=percentile, y=enr, label=tf), 
-             alpha=1, color="black", nudge_x=-0.3, nudge_y=0.1,  direction="x")+
+             alpha=1, color="black", nudge_x=-0.5, nudge_y=0.2,  direction="x")+
   geom_point(aes(color=prop_co_peak))+
   geom_point(subset(freqTrueDt, paradigm=="activation"), 
              mapping=aes(color=prop_co_peak), size=2)+
@@ -198,8 +201,8 @@ coRankSim <- ggplot(subset(freqAll, paradigm=="activation"), aes(x=percentile, y
                         colours=viridis(length(unique(freqAll$prop_co_peak))), 
                         name="Proportion of matches co-occuring with true motif")+
   facet_grid(cols=vars(tf))+
-  ylab("Enrichment of motif\nin ChIP-peaks")+
-  xlab("Enrichment percentile")+
+  ylab("Enrichment of motif\nin ATAC-peaks overlapping ChIP-peaks")+
+  xlab("Enrichment quantile")+
   labs(tag="B")+
   theme_bw()+
   theme(legend.box.just="left",
@@ -208,12 +211,12 @@ coRankSim <- ggplot(subset(freqAll, paradigm=="activation"), aes(x=percentile, y
         legend.key.width = unit(1, "cm"))
 
 coRankGC <- ggplot(subset(freqAll, paradigm=="activation"), aes(x=percentile, y=enr))+
-  geom_label_repel(subset(freqTop, paradigm=="activation" & motif_id!="CTCF"), 
+  geom_label_repel(subset(freqTop, paradigm=="activation" & !(motif_id %in% c("CTCF", "CEBPB"))), 
              mapping=aes(x=percentile, y=enr, label=motif_id), 
              alpha=1, color="grey", nudge_x=-0.3, nudge_y=0.3)+
   geom_label_repel(subset(freqTrueDt, paradigm=="activation"), 
              mapping=aes(x=percentile, y=enr, label=tf), 
-             alpha=1, color="black", nudge_x=-0.3, nudge_y=0.1,  direction="x")+
+             alpha=1, color="black", nudge_x=-0.5, nudge_y=0.2,  direction="x")+
   geom_point(aes(color=GC_content))+
   geom_point(subset(freqTrueDt, paradigm=="activation"), 
              mapping=aes(color=GC_content), size=2)+
@@ -222,8 +225,8 @@ coRankGC <- ggplot(subset(freqAll, paradigm=="activation"), aes(x=percentile, y=
                         colours=inferno(length(unique(freqAll$GC_content))), 
                         name="GC content")+
   facet_grid(cols=vars(tf))+
-  ylab("Enrichment of motif\nin ChIP-peaks")+
-  xlab("Enrichment percentile")+
+  ylab("Enrichment of motif\nin ATAC-peaks overlapping ChIP-peaks")+
+  xlab("Enrichment quantile")+
   scale_size(range=c(0,1))+
   labs(tag="C")+
   theme_bw()+
@@ -283,8 +286,8 @@ plot_grid(motifPlot & theme(plot.tag = element_text(face="bold", size=16)), righ
 ```
 
 
-**`r getFigNb()` : Overview of the simulated TFs.**
-**A:** Number of peaks, proportion of ChIP-seq and/or ATAC-seq peaks with a motif, and fold-enrichment of the ChIP-seq peaks for the motif across the four TFs. **B-C:** Log2 fold-enrichment of all tested motifs among the ChIP-seq peaks (relative to ATAC-seq peaks), with the true motif labeled in black. The dots are colored either by co-occurence with the true motif (**B**) or by GC content (**C**). **D:** GC content distributions of the ChIP-seq peaks of each TF.
+**`r getFigNb()` : Overview of the simulated TFs.** Data shown correspond to the semi-simulated datasets with a pertubation strength of 1 in the activation paradigm.
+**A:** Number of peaks, proportion of ChIP-seq and/or ATAC-seq peaks with a motif, and fold-enrichment of ATAC-peaks overlapping ChIP-seq peaks (i.e. bound peaks) for the motif across the four TFs. **B-C:** Enrichment of all tested motifs among the ATAC-seq peaks overlapping ChIP-seq peaks (relative to all ATAC-seq peaks), with the true motif labeled in black. The dots are colored either by co-occurence with the true motif (**B**) or by GC content (**C**). **D:** GC content distributions of the ChIP-seq peaks of each TF.
 
 
 \newpage
@@ -660,7 +663,7 @@ relAUCplot2 <- function(res, doDraw=TRUE, column_title="Datasets",
   ancols <- list(type=c(deletion="darkorange3", dTag="black", ligand="darkslateblue"))
   
   colAnnot <- data.table(dataset=colnames(rankMat))
-  colAnnot[,c("Effect strength", "TF"):=tstrsplit(dataset, split="_", keep=1:2)]
+  colAnnot[,c("Pertubation strength", "TF"):=tstrsplit(dataset, split="_", keep=1:2)]
   colEs <- brewer.pal(5, "Blues")
   names(colEs) <- c(0, 0.25, 0.5, 1, 3)
   tfCols <- c("darkorange3", "black", "darkslateblue", "darkolivegreen")
@@ -672,9 +675,9 @@ relAUCplot2 <- function(res, doDraw=TRUE, column_title="Datasets",
   setorder(colAnnot, TF)
   
   #setorder(colAnnot, tf, effect_strength)
-  colan <- HeatmapAnnotation(df=as.data.frame(colAnnot[,c("TF", "Effect strength"), with=FALSE]),
+  colan <- HeatmapAnnotation(df=as.data.frame(colAnnot[,c("TF", "Pertubation strength"), with=FALSE]),
                              col=list("TF"=tfCols,
-                                      "Effect strength"=colEs), 
+                                      "Pertubation strength"=colEs), 
                              show_annotation_name=FALSE)
 
   rann <- getMethodAnno(methods)
@@ -699,12 +702,12 @@ relAUCplot2 <- function(res, doDraw=TRUE, column_title="Datasets",
      col=viridisLite::magma(100), 
      name="Relative\nnetwork AUC",
      column_title=column_title, 
-     column_labels=colAnnot$`Effect strength`,
+     column_labels=colAnnot$`Pertubation strength`,
      row_labels=methods,
      row_order=ro, 
      column_split=colAnnot$TF,
      row_split=rowAnnot$paradigm,
-     column_order=colnames(rankMat)[order(colAnnot$TF, colAnnot$`Effect strength`)],
+     column_order=colnames(rankMat)[order(colAnnot$TF, colAnnot$`Pertubation strength`)],
      row_names_side="left", top_annotation=colan)
   
   if(!doDraw) return(h)
@@ -734,7 +737,7 @@ rankHeatmap2 <- function(res, rankBreaks=c(1,10,30,75,150,300,600), ...,
   ancols <- list(type=c(deletion="darkorange3", dTag="black", ligand="darkslateblue"))
   
   colAnnot <- data.table(dataset=colnames(rankMat))
-  colAnnot[,c("Effect strength", "TF"):=tstrsplit(dataset, split="_", keep=1:2)]
+  colAnnot[,c("Pertubation strength", "TF"):=tstrsplit(dataset, split="_", keep=1:2)]
   colEs <- brewer.pal(5, "Blues")
   names(colEs) <- c(0, 0.25, 0.5, 1, 3)
   tfCols <- c("darkorange3", "black", "darkslateblue", "darkolivegreen")
@@ -744,9 +747,9 @@ rankHeatmap2 <- function(res, rankBreaks=c(1,10,30,75,150,300,600), ...,
   setorder(colAnnot, TF)
   
   #setorder(colAnnot, tf, effect_strength)
-  colan <- HeatmapAnnotation(df=as.data.frame(colAnnot[,c("TF", "Effect strength"), with=FALSE]),
+  colan <- HeatmapAnnotation(df=as.data.frame(colAnnot[,c("TF", "Pertubation strength"), with=FALSE]),
                              col=list("TF"=tfCols,
-                                      "Effect strength"=colEs), 
+                                      "Pertubation strength"=colEs), 
                              show_annotation_name=FALSE)
 
   bdist <- log10(rankBreaks[-1]-rankBreaks[-length(rankBreaks)])
@@ -770,12 +773,12 @@ rankHeatmap2 <- function(res, rankBreaks=c(1,10,30,75,150,300,600), ...,
           },
      col=viridisLite::viridis(100, direction=-1), name="Rank of\ntrue TF",
      column_title=column_title, 
-     column_labels=colAnnot$`Effect strength`,
+     column_labels=colAnnot$`Pertubation strength`,
      row_labels=methods,
      row_order=ro, 
      column_split=colAnnot$TF,
      row_split=rowAnnot$paradigm,
-     column_order=colnames(rankMat)[order(colAnnot$TF, colAnnot$`Effect strength`)], 
+     column_order=colnames(rankMat)[order(colAnnot$TF, colAnnot$`Pertubation strength`)], 
      left_annotation=rowann, row_names_side="left", top_annotation=colan,
      heatmap_legend_param=list(at=rev(sqrt(rankBreaks)),
                                labels=rev(c("top",rankBreaks[-1])),
@@ -984,11 +987,9 @@ res[,method:=tstrsplit(method, keep=1, split=".", fixed=TRUE)]
 res[,gc:=fifelse(gc=="all_baseline", "all baseline", gc)]
 res[,gc:=fifelse(gc=="all_strong", "all strong", gc)]
 res[,gc:=fifelse(gc=="group_NA", "grouped", gc)]
-res[,gc:=fifelse(gc=="intermediate_1", "intermediate 1", gc)]
-res[,gc:=fifelse(gc=="intermediate_2", "intermediate 2", gc)]
+res[,gc:=fifelse(gc=="intermediate_1", "intermediate", gc)]
 res$gc <- factor(res$gc, levels=c("all baseline", "all strong", 
-                                  "intermediate 1", "intermediate 2",
-                                  "grouped"))
+                                  "intermediate", "grouped"))
 
 # relcalculate ranks
 res[,rank:=order(p, -abs(logFC)), by=c("tf", "paradigm", "es", "method", "gc")]
@@ -1144,4 +1145,4 @@ tls <- ggplot(resAg,
 ```
 
 **`r getFigNb()` : Estimated precisions per dataset**
-Heatmap of precision estimates obtained per dataset and method on the 11 real datasets (**A**), as well as across each perturbation strength of the simulations (**B**).
+Heatmap of precision estimates obtained per dataset and method on the 11 real datasets (**A**), as well as averaged across each perturbation strength of the simulations (**B**).
