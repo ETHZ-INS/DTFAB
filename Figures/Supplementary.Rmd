@@ -434,7 +434,7 @@ lower or equal to the observed one.
 
 # `r getFigNb(TRUE)`
 
-```{r, fig.width=4, fig.height=7}
+```{r, fig.width=4, fig.height=6}
 densities <- data.frame(sample=c("NFKB.1","NFKB.2","Scrambled.1","Scrambled.1","DMSO"),
                         condition=c("NFKB","NFKB","Scrambled","Scrambled","DMSO"),
                         value=c(3674.397, 4182.298, 6229.71, 6157.883, 8588.919))
@@ -448,7 +448,7 @@ pd <- ggplot(dag, aes(condition, value)) +
   labs(y="p50/NFkB1 density ratio to GAPDH,\nas a proportion to DMSO")
   
 plot_grid( ggdraw() + draw_image("traftac_WB.png") + coord_cartesian(expand=0),
-           pd, nrow=2, labels="AUTO")
+           pd, nrow=2, labels="AUTO", rel_heights=c(2,3), scale=0.95)
 ```
 
 
