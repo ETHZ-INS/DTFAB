@@ -90,7 +90,7 @@ ctcfPeaksDir <- "./data/ChIP_peaks/motif_CTCF.bed"
 
 Define simulation parameters
 ```{r, simulation parameters}
-simParams <- as.data.table(expand.grid(es=c(0, 0.25, 0.5, 1, 3),
+simParams <- as.data.table(expand.grid(es=c(0.25, 0.5, 1, 3),
                                        tf=c("ZNF143", "MAZ", "CEBPB", "CTCF"),
                                        paradigm=c("activation", 
                                                   "haploinsufficiency")))
