@@ -1,10 +1,9 @@
-# dATestedgeR by E. Sonder
+# see: https://www.nature.com/articles/s41598-020-66998-4#data-availability
+# code from partially from: https://github.com/Zhang-lab/ATACseq_benchmarking/blob/master/simulated_ATAC_tests_edgeR.R
 
 dATestedgeR <- function(counts_control, counts_perturbed,
                         norm.method=c("TMM","GCQuantileNorm","GCSmoothQuantile")){
-  # literature: https://www.nature.com/articles/s41598-020-66998-4#data-availability
-  # code from: https://github.com/Zhang-lab/ATACseq_benchmarking/blob/master/simulated_ATAC_tests_edgeR.R
-  
+
   norm.method <- match.arg(norm.method)
 
   cond <- c(rep("ctrl", ncol(counts_control)), 
