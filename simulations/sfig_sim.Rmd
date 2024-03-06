@@ -107,15 +107,15 @@ propDt <- melt(propDt, id.vars=c("tf", "paradigm", "es"),
                value.name="proportion")
 propDt[,variable:=as.character(variable)]
 propDt[, variable:=fifelse(variable=="motif_prop", 
-                           "input ChIP-peaks", variable)]
+                           "ChIP-peaks", variable)]
 propDt[, variable:=fifelse(variable=="motif_prop_chip", 
-                           "ATAC-peaks\noverlaping ChIP-peaks", variable)]
+                           "ATAC-peaks\noverlapingChIP-peaks", variable)]
 propDt[, variable:=fifelse(variable=="motif_prop_atac", 
                            "All ATAC-peaks", variable)]
 propDt$variable <- factor(propDt$variable, 
                           levels=c("All ATAC-peaks",
-                                   "ATAC-peaks \noverlapping ChIP-peaks",
-                                   "input ChIP-peaks"),
+                                   "ATAC-peaks\noverlapingChIP-peaks",
+                                   "ChIP-peaks"),
                           ordered=TRUE)
 
 
