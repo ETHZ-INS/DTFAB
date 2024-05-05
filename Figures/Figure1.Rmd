@@ -15,10 +15,10 @@ source("../Scripts/plot.R")
 source("../Scripts/runMethods.R")
 res <- readRDS("../fullFrags/results.rds")
 res <- res[which(!(res$method %in% c("Ridge-lm", # redundant with lasso
-                                     "GCsmooth>fastMLM>limma"),] # show in a later step
+                                     "GCsmooth>fastMLM>limma"))),] # show in a later step
 ```
 
-```{r, fig.width=9, fig.height=10}
+```{r, fig.width=9, fig.height=10.5}
 h1 <- rankHeatmap2(res, doDraw=FALSE, column_title="Rank of true TF", row_names_gp=gpar(fontsize=10))
 h2 <- suppressWarnings(relAUCplot2(res, row_order=names(row_order(h1)), doDraw=FALSE,
                   column_title="Network score", column_order=names(column_order(h1))))
@@ -42,7 +42,7 @@ fig
 ```
 
 ```{r}
-pdf("Figure1.pdf", width=9, height=10)
+pdf("Figure1.pdf", width=9, height=10.5)
 fig
 dev.off()
 ```
