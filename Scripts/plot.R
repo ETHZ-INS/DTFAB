@@ -265,7 +265,7 @@ getMainMethods <- function(){
 
 getMethodAnno <- function(methods){
   methods <- unique(methods)
-  LFCbased <- grepl("GSEA|ulm|msViper|decoupleR:|MonaLisa|diffTF|-lm",
+  LFCbased <- grepl("GSEA|ulm|msViper|decoupleR:|MonaLisa|diffTF|meirlop|-lm",
                     methods,ignore.case=TRUE) &
     !grepl("decoupleR.+limma",methods,ignore.case=TRUE)
   family <- grepl("chromVAR",methods) + 10*grepl("monaLisa",methods) +
