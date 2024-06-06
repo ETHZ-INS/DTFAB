@@ -91,13 +91,14 @@ runAllMt <- function(datasets=getDatasets(), nthreads=3, ...){
 #' @param readlist Vector of paths to aligned files, otherwise will be detected 
 #'   from folder.
 #' @param DA.norm Normalization method to use for peak differential accessibility
+#' @param useArchetypes Logical; whether to use archetypes instead of motifs
 #' 
 #' @return A list of dataframes for each method (also saves them to disk)
 runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
                        methods=getMethods(), rndSeed=1997, peakWidth=300, 
                        decoupleR_modes=c("mlm", "ulm", "udt", "wsum"),
                        forceRerun=FALSE, outSubfolder="runATAC_results",
-                       readlist=NULL, DA.norm="TMM"){
+                       readlist=NULL, DA.norm="TMM", useArchetypes=FALSE){
   
   methods <- match.arg(methods, 
                        several.ok=TRUE, 
@@ -184,13 +185,18 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
   seqlevelsStyle(peaks) <- seqStyle
   seqlevelsStyle(genome) <- seqStyle  
 
-  motifs <- fixMotifs(getNonRedundantMotifs("universal", spec=spec),
-                      spec=spec, scriptsFolder)
+  if(useArchetypes){
+    motifs <- ifelse(spec=="Hsapiens","mergedMotifs.human.rds",
+                     "mergedMotifs.mouse.rds")
+    motifs <- readRDS(file.path(scriptsFolder,"..","misc",motifs))
+  }else{
+    motifs <- fixMotifs(getNonRedundantMotifs("universal", spec=spec),
+                        spec=spec, scriptsFolder)
+  }
   universalmotif::write_meme(motifs, mypath("others/motifs.meme",outSubfolder),
                              overwrite=TRUE)
   universalmotif::write_jaspar(motifs, mypath("others/motifs.jaspar",outSubfolder),
                                overwrite=TRUE)
-  
   
   # use pmoi if available
   if(file.exists(pmoiPath <- mypath("others/pmoi.rds",outSubfolder)) && 
