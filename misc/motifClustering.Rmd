@@ -1,0 +1,72 @@
+---
+title: "Motif clustering"
+output: html_document
+date: "2024-06-05"
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(universalmotif)
+  library(TFBSTools)
+  library(bluster)
+  library(igraph)
+})
+```
+
+# mouse
+
+```{r}
+mo <- readRDS("../fullFrags/BANP/runATAC_results/others/motifs.rds")
+
+cc <- universalmotif::compare_motifs(mo, nthreads = 10, score.strat = "wa.mean")
+cc[is.na(cc)] <- 0
+h <- as.dendrogram(hclust(as.dist(1-cc), method = "complete"))
+
+cl <- lapply(cut(as.dendrogram(h), h=0.35)$lower, FUN=labels)
+
+# knn <- bluster::makeSNNGraph(cc, k=7, type="number")
+# set.seed(123)
+# cl <- cluster_leiden(knn, resolution_parameter = 3, n_iterations = 10)
+# cl <- split(row.names(cc), cl$membership)
+
+merged <- lapply(cl, FUN=function(x){
+  if(length(x)==1) return(mo[[x]])
+  merge_motifs(mo[x])
+})
+names(merged) <- sapply(cl, FUN=paste, collapse="/")
+# check the merge:
+cc2 <- universalmotif::compare_motifs(merged, score.strat = "wa.mean")
+ComplexHeatmap::Heatmap(cc2, show_row_names=FALSE, show_column_names=FALSE)
+saveRDS(merged, "mergedMotifs.mouse.rds")
+```
+
+
+# human
+
+
+```{r}
+mo <- readRDS("../fullFrags/GATA1/runATAC_results/others/motifs.rds")
+names(mo) <- sapply(mo, FUN=function(x) x@name)
+
+cc <- universalmotif::compare_motifs(mo, nthreads = 10, score.strat = "wa.mean")
+cc[is.na(cc)] <- 0
+
+h <- hclust(as.dist(1-cc), method = "complete")
+cl <- lapply(cut(as.dendrogram(h), h=0.45)$lower, FUN=labels)
+
+merged <- lapply(cl, FUN=function(x){
+  if(length(x)==1) return(mo[[x]])
+  merge_motifs(mo[x])
+})
+names(merged) <- sapply(cl, FUN=paste, collapse="/")
+# check the merge:
+cc2 <- universalmotif::compare_motifs(merged, score.strat = "wa.mean")
+cc2[is.na(cc2)] <- 0
+ComplexHeatmap::Heatmap(cc2, show_row_names=FALSE, show_column_names=FALSE)
+saveRDS(merged, "mergedMotifs.human.rds")
+```
+
+```{r}
+sessionInfo()
+```
+

@@ -6,15 +6,23 @@
 #' @param interactors A named list of interactors per TF
 #'
 #' @return A data.frame of compiled metrics
-compileBenchmark <- function(datasets, rootPath=".", resin="runATAC_results", interactors){
+compileBenchmark <- function(datasets, rootPath=".", resin="runATAC_results",
+                             interactors, archetypes){
   res <- list()
   for(dn in names(datasets)){
     ds <- datasets[[dn]]
     if(!is.null(ds$folder)) dn <- ds$folder
+    archs <- lapply(archetypes, FUN=function(archs){
+      setNames(strsplit(names(archs),"/"), names(archs))
+    })
     print(dn)
     tryCatch(
-      res[[dn]] <- getBenchmarkMetrics(ds, file.path(rootPath, dn), interactors=interactors),
-      error=function(e) message(e))
+      res[[dn]] <- getBenchmarkMetrics(ds, file.path(rootPath, dn),
+                                       interactors=interactors, archetypes=archs),
+      error=function(e){
+        message(e);
+        #traceback()
+      })
   }
   dplyr::bind_rows(res, .id="dataset")
 }
@@ -26,10 +34,16 @@ compileBenchmark <- function(datasets, rootPath=".", resin="runATAC_results", in
 #' @param path The path in which the dataset's results are
 #' @param resin The name of the results subfolder
 #' @param interactors A named list of interactors per TF
+#' @param archetypes An optional list of archetypes for each species. Each list
+#'  should itself be a list of archetypes, with each archetype being
+#'   a character vector of the motifs in it.
 #'
 #' @return A data.frame of compiled metrics for one dataset
 getBenchmarkMetrics <- function(dataset, path=head(dataset$truth,1),
-                                resin="runATAC_results", interactors){
+                                resin="runATAC_results", interactors,
+                                archetypes=NULL){
+  stopifnot(is.null(archetypes) || is.list(archetypes))
+  stopifnot(is.list(interactors))
   # grab runtimes
   fl <- list.files(file.path(path, resin, "raw"), full=TRUE)
   names(fl) <- gsub("_raw\\.rds$","",basename(fl))
@@ -40,7 +54,7 @@ getBenchmarkMetrics <- function(dataset, path=head(dataset$truth,1),
     }else{
       x <- x[[2]]
     }
-    if(is(x,"proc_time")) x <- summary(x)
+    if(isTRUE(try(is(x,"proc_time"),silent=TRUE))) x <- summary(x)
     x
   })
   rt <- rbind(elapsed=rt["elapsed",], cpu=colSums(rt[which(row.names(rt)!="elapsed"),]))
@@ -64,15 +78,51 @@ getBenchmarkMetrics <- function(dataset, path=head(dataset$truth,1),
   res <- lapply(fl, readRDS)
   res <- res[sapply(res, FUN=function(x) isTRUE(nrow(x)>1))]
   
-  res <- dplyr::bind_rows(lapply(res, truth=dataset$truth, interactors=interactors,
-                                 FUN=.getBenchmarkMetrics), .id="method")
+  res <- dplyr::bind_rows(lapply(res, FUN=function(x){
+    m <- .getBenchmarkMetrics(x, truth=dataset$truth, interactors=interactors)
+    if(!is.null(archetypes)){
+      arch <- archetypes[[dataset$species]]
+      arch <- unlist(arch[which(lengths(lapply(arch, y=dataset$truth,
+                                               FUN=intersect))>0)])
+      m2 <- .getBenchmarkMetrics(x, truth=dataset$truth, interactors=arch)
+      m$archRelAUC <- m2$relAUC
+      m3 <- .getArchMetrics(x, dataset$truth, cofactors=interactors,
+                            archetypes=archetypes[[dataset$species]])
+      cbind(m, m3)
+    }
+  }), .id="method")
   res$elapsed <- rt[res$method, "elapsed"]
   res$cpu <- rt[res$method, "cpu"]
   res
 }
 
+.getArchMetrics <- function(x, truth, archetypes, cofactors){
+  if(is.list(cofactors))
+    cofactors <- unique(unlist(cofactors[intersect(truth,names(cofactors))]))
+  tf2arch <- setNames(unlist(archetypes), names(archetypes))
+  x$arch <- tf2arch[row.names(x)]
+  w <- which(is.na(x$arch))
+  x$arch[w] <- row.names(x)[w]
+  trueArch <- unique(x$arch[which(row.names(x) %in% c(truth))])
+  notFalseArch <- unique(x$arch[which(row.names(x) %in% c(truth,cofactors))])
+  x$trueArch <- x$arch %in% trueArch
+  x$notFalseArch <- x$arch %in% notFalseArch
+  w <- head(which(x$trueArch),1)
+  xsig <- x[which(x$padj<0.05),,drop=FALSE]
+  if(length(w)==0){
+    w <- nrow(x)+1L
+    return(data.frame(archRank=w, archSens=0, archFDR=1))
+  }
+  data.frame(archRank=w, archSens=as.numeric(x[w,"padj"]<0.05),
+             archFDR=sum(!xsig$notFalseArch)/nrow(xsig))
+}
+
 .getBenchmarkMetrics <- function(x, truth, interactors){
-  cofactors <- unique(c(truth, unlist(interactors[truth])))
+  if(is.list(interactors)){
+    cofactors <- unique(c(truth, unlist(interactors[truth])))
+  }else{
+    cofactors <- union(truth, interactors)
+  }
   allTFs <- row.names(x)
   cofactors <- intersect(cofactors, allTFs)
   cappedNCof <- min(length(cofactors),100)
@@ -94,7 +144,6 @@ getBenchmarkMetrics <- function(dataset, path=head(dataset$truth,1),
              FDR=sum(!xsig$isCofactor)/nrow(xsig),
              AUC=auc, relAUC=auc/optimalAUC)
 }
-
 
 # fetch a list of interactors for all requested TFs
 getAllInteractors <- function(datasets, extra=c("CEBPB", "MAZ", "ZNF143", "NR3C1")){

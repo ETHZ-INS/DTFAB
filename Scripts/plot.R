@@ -14,18 +14,16 @@ rankHeatmap2 <- function(res, rankBreaks=c(1,10,30,75,150,300,600), ...,
                          column_title="Datasets", doDraw=TRUE, rowann=NULL,
                          datasetInfo=data.frame(
                           type=sapply(getDatasets(), FUN=function(x) x$type)),
-                         cellLabelFontsize=8){
+                         cellLabelFontsize=8, row_order=NULL, column_order=NULL){
   library(ComplexHeatmap)
   rankm <- reshape2::dcast(res, method~dataset, value.var="rank")
   row.names(rankm) <- rankm[,1]
   rankm <- sqrt(as.matrix(rankm[,-1]))
-  imput <- pmin(colMeans(rankm,na.rm=TRUE),
-                matrixStats::colMedians(rankm,na.rm=TRUE))
-  rankmImputed <- rankm
-  for(i in seq_len(ncol(rankm)))
-    rankmImputed[which(is.na(rankm[,i])),i] <- imput[i]
-  ro <- row.names(rankm)[order(rowMeans(rankmImputed, na.rm=TRUE))]
-  column_order <- names(sort(-colMeans(rankm, na.rm=TRUE)))
+  rankmImputed <- .getImputed(rankm)
+  if(is.null(row_order)) 
+    row_order <- row.names(rankm)[order(rowMeans(rankmImputed, na.rm=TRUE))]
+  if(is.null(column_order))
+    column_order <- names(sort(-colMeans(rankm, na.rm=TRUE)))
   ancols <- list(type=c(deletion="darkorange3", dTag="black", ligand="darkslateblue"))
   colan <- HeatmapAnnotation(df = datasetInfo[colnames(rankm),,drop=FALSE],
                              col=ancols, show_annotation_name=FALSE)
@@ -40,8 +38,8 @@ rankHeatmap2 <- function(res, rankBreaks=c(1,10,30,75,150,300,600), ...,
                       gp = gpar(fontsize=ifelse(is.na(rankm[i, j]),6,
                                                 cellLabelFontsize)))
           },
-     col=viridisLite::viridis(100, direction=-1), name="Rank of\ntrue TF",
-     column_title=column_title, row_order=ro, column_order=column_order, ..., 
+     col=viridisLite::viridis(100, direction=-1), name="Rank of\ntrue TF", ...,
+     column_title=column_title, row_order=row_order, column_order=column_order, 
      left_annotation=rowann, row_names_side="left", top_annotation=colan,
      heatmap_legend_param=list(at=rev(sqrt(rankBreaks)),
                                labels=rev(c("top",rankBreaks[-1])),
@@ -52,17 +50,22 @@ rankHeatmap2 <- function(res, rankBreaks=c(1,10,30,75,150,300,600), ...,
 }
 
 
-sensFDRplot <- function(res, fade=NULL, PR=TRUE, hull=TRUE, label.size=3.5, longTitles=TRUE){
+sensFDRplot <- function(res, fade=NULL, PR=TRUE, hull=TRUE, label.size=3.5, longTitles=TRUE, useArch=FALSE){
   res$Sensitivity <- res$trueQ<0.05
   res$FDR[which(is.na(res$FDR))] <- 0
+  if(!is.null(res$archFDR)) res$archFDR[which(is.na(res$archFDR))] <- 0
   if(is.null(res$type)){
     res$type <- ifelse(grepl("GSEA|ulm|msViper|decoupleR|MonaLisa|diffTF|-lm|Lasso",
                              res$method, ignore.case=TRUE), "LFC-based", "sample-wise")
   }
   cols <- setNames(c("#CC6677", "#4477AA"), unique(res$type))
-  res2 <- aggregate(res[,c("Sensitivity", "FDR")], by=res[,c("method","type")],
+  res2 <- aggregate(res[,c("Sensitivity", "FDR","archFDR")], by=res[,c("method","type")],
                     na.rm=TRUE, FUN=mean)
-  res2$precision <- 1-res2$FDR
+  if(useArch){
+    res2$precision <- 1-res2$archFDR
+  }else{
+    res2$precision <- 1-res2$FDR
+  }
   res2$fade <- FALSE
   if(!is.null(fade)) res2$fade <- grepl(fade, res2$method)
   res3 <- res2[chull(res2$Sensitivity, res2$precision),]
@@ -73,9 +76,13 @@ sensFDRplot <- function(res, fade=NULL, PR=TRUE, hull=TRUE, label.size=3.5, long
   if(PR){
     p <- ggplot(res2, aes(Sensitivity, precision, label=method, colour=type, alpha=fade))
     if(longTitles){
+      yl <- ifelse(useArch,
+                   "Precision (i.e. 1-FDR)\n(Proportion in network archetypes)",
+                   "Precision (i.e. 1-FDR)\n(Proportion of network motifs among significant)"
+                   )
       p <- p +
       labs(x="Recall (i.e. sensitivity)\n(Proportion of datasets in which the true motif is significant)",
-           y="Precision (i.e. 1-FDR)\n(Proportion of network motifs among significant)")
+           y=yl)
     }else{
       p <- p +
         labs(x="Recall (i.e. sensitivity)",
@@ -107,22 +114,49 @@ relAUCplot <- function(res, squeeze=FALSE){
   p
 }
 
-relAUCplot2 <- function(res, doDraw=TRUE, column_title="Datasets", 
-                        column_order=NULL, row_order=NULL, ..., 
+.getImputed <- function(x){
+  imput <- pmin(colMeans(x,na.rm=TRUE),
+                matrixStats::colMedians(x,na.rm=TRUE))
+  rankmImputed <- x
+  for(i in seq_len(ncol(x)))
+    rankmImputed[which(is.na(x[,i])),i] <- imput[i]
+  rankmImputed
+}
+
+getOrder <- function(res, values=c("sqrtRank","relAUC","archRelAUC"),
+                     columns=FALSE){
+  x <- -sqrt(res$rank-1)
+  res$sqrtRank <- 2*exp(x)/(1+exp(x))
+  y <- lapply(values, FUN=function(x){
+    x <- as.data.frame(reshape2::dcast(res, method~dataset, value.var=x))
+    row.names(x) <- x[,1]
+    .getImputed(as.matrix(x[,-1]))
+  })
+  if(columns){
+    y <- do.call(rbind, y)
+    return(colnames(y)[order(colMeans(y)+colMedians(y))])
+  }
+  y <- do.call(cbind, y)
+  row.names(y)[order(rowMeans(y) + rowMedians(y))]
+}
+
+relAUCplot2 <- function(res, doDraw=TRUE, column_title="Datasets", name=NULL,
+                        column_order=NULL, row_order=NULL, ..., val="relAUC", col="AUC",
                         type=c("propOfMax","MAD","relAUC"), cellLabelFontsize=8,
+                        hmcolors=viridisLite::magma(100),
                         datasetInfo=data.frame(
                            type=sapply(getDatasets(), FUN=function(x) x$type))){
   type <- match.arg(type)
-  m1 <- reshape2::dcast(res, method~dataset, value.var="relAUC")
+  m1 <- reshape2::dcast(res, method~dataset, value.var=val)
   if(type=="propOfMax"){
-    dmax <- aggregate(res$AUC, by=list(ds=res$dataset), na.rm=TRUE, FUN=max)
+    dmax <- aggregate(res[[col]], by=list(ds=res$dataset), na.rm=TRUE, FUN=max)
     dmax <- setNames(dmax$x, dmax$ds)
-    res$AUCprop <- res$AUC/dmax[as.character(res$dataset)]
+    res$AUCprop <- res[[col]]/dmax[as.character(res$dataset)]
     m <- reshape2::dcast(res, method~dataset, value.var="AUCprop")
   }else if(type=="MAD"){
-    dmed <- aggregate(res$relAUC, by=list(ds=res$dataset), na.rm=TRUE, FUN=median)
+    dmed <- aggregate(res[[val]], by=list(ds=res$dataset), na.rm=TRUE, FUN=median)
     dmed <- setNames(dmed$x, dmed$ds)
-    res$AUCdiff <- res$relAUC-dmed[as.character(res$dataset)]
+    res$AUCdiff <- res[[val]]-dmed[as.character(res$dataset)]
     res$AUCdiff <- res$AUCdiff/median(abs(res$AUCdiff),na.rm=TRUE)
     m <- reshape2::dcast(res, method~dataset, value.var="AUCdiff")
   }else{
@@ -137,7 +171,9 @@ relAUCplot2 <- function(res, doDraw=TRUE, column_title="Datasets",
   ancols <- list(type=c(deletion="darkorange3", dTag="black", ligand="darkslateblue"),
                  LFCbased=c("FALSE"="white", "TRUE"="brown4"))
   colan <- HeatmapAnnotation(df = datasetInfo[colnames(m),,drop=FALSE],
-                             col=ancols)
+                             col=ancols, show_annotation_name=FALSE)
+  if(is.null(name))
+    name <- ifelse(type=="relAUC","Relative\nnetwork AUC","Relative\nnetwork\nscore")
   h <- ComplexHeatmap::Heatmap(
       m, cluster_rows=FALSE, cluster_columns=FALSE, ..., column_order=column_order,
       cell_fun=function(j, i, x, y, width, height, fill) {
@@ -149,8 +185,7 @@ relAUCplot2 <- function(res, doDraw=TRUE, column_title="Datasets",
                                                    cellLabelFontsize),
                                    col=ifelse(m[i,j]<0.5,"lightgrey","black")))
       },
-      col=viridisLite::magma(100),
-      name=ifelse(type=="relAUC","Relative\nnetwork AUC","Relative\nnetwork\nscore"),
+      col=hmcolors, name=name,
       column_title=column_title, row_names_side="left", top_annotation=colan)
   if(!doDraw) return(h)
   draw(h, merge=TRUE)

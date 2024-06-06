@@ -13,12 +13,14 @@ source("../Scripts/compileBenchmark.R")
 source("../Scripts/runMethods.R")
 source("../Scripts/plot.R")
 interactors <- readRDS("../Scripts/allInteractors.rds")
+archs <- list(h=readRDS("../misc/mergedMotifs.human.rds"),
+              m=readRDS("../misc/mergedMotifs.mouse.rds"))
 ```
 
 ```{r, eval=FALSE}
 datasets <- getDatasets()
-res <- compileBenchmark(datasets, interactors=interactors)
-res <- res[res$method!="dev" & !grepl("trend$|ihw$|^CVb",res$method),]
+res <- compileBenchmark(datasets, interactors=interactors, archetypes = archs)
+res <- res[res$method!="dev" & !grepl("trend$|ihw$|^CVb|noI$",res$method),]
 res <- renameMethods(res)
 # time was recorded only for the main chromVAR variants, so use that for all
 cvtime <- colMeans(as.matrix(
@@ -39,12 +41,27 @@ res3 <- filterMethods(res)
 ```{r, fig.width=8, fig.height=10, eval=FALSE}
 # quick check
 res <- readRDS("results.rds")
-rankHeatmap2(res)
+h1 <- rankHeatmap2(res, doDraw = FALSE)
+draw(h1)
 ```
+
+```{r, fig.width=12, fig.height=10, eval=FALSE}
+h2 <- suppressWarnings(relAUCplot2(res, row_order=names(row_order(h1)), doDraw=FALSE,
+                  column_title="Network score", column_order=names(column_order(h1))))
+h3 <- suppressWarnings(relAUCplot2(res, row_order=names(row_order(h1)), doDraw=FALSE,
+                  column_title="Archetype score", val="archRelAUC", col="archRelAUC", column_order=names(column_order(h1))))
+h1 + h2 + h3
+```
+
+
 
 ```{r, fig.width=7, fig.height=4}
 res3 <- res[grep("^CVdev|chromVAR",res$method),]
 res3 <- res3[!grepl("trend",res3$method),]
 rankHeatmap2(res3)
+```
+
+```{r}
+
 ```
 
