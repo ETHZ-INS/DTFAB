@@ -1,0 +1,96 @@
+---
+title: "00_preprocessing"
+author: "Emanuel Sonder"
+date: "06 11 2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(Rsamtools)
+library(BiocParallel)
+library(GenomicAlignments)
+library(regioneR)
+library(BSgenome.Hsapiens.UCSC.hg38)
+library(MASS)
+library(mclust)
+library(Repitools)
+library(data.table)
+
+data.table::setDTthreads(2)
+```
+
+# ATAC fragments
+
+```{r, atac paths}
+bedBaseDir <- "./data/ATAC_beds"
+Sys.setenv(bedBaseDir=bedBaseDir)
+```
+
+
+```{bash engine.opts='-l', eval=TRUE}
+cd $bedBaseDir
+for f in *.bam
+do
+  samtools sort -n "$f" -o "${f}_sorted.bam"
+  bedtools bamtobed -i "${f}_sorted.bam" -bedpe > "${f}_sorted.bed"
+done
+```
+
+
+Convert to GRanges for convenience later: 
+```{r, convert to GRanges, eval=TRUE}
+bedDirs <- list.files(bedBaseDir)
+bedDirs <- bedDirs[endsWith(bedDirs, "_sorted.bed") & !grepl("merged", bedDirs)]
+
+lapply(bedDirs, function(bedFileName){
+  bedPath <- file.path(bedBaseDir, bedFileName)
+  readPairs <- fread(bedPath)
+  
+  frags <- GRanges(seqnames=readPairs$V1, 
+                           IRanges(start=pmin(readPairs$V2, 
+                                              readPairs$V5), 
+                                   end=pmax(readPairs$V3, 
+                                            readPairs$V6)))
+  
+  bedFileBaseName <- unlist(tstrsplit(bedFileName, split=".", fixed=TRUE, keep=1))
+  saveRDS(frags, file.path(bedBaseDir, paste0(bedFileBaseName, ".rds")))
+})
+```
+
+# ATAC peak calling
+
+Merge fragments of samples
+```{R, merge bed files, eval=FALSE}
+bedDirs <- list.files(bedBaseDir, full.names=TRUE)
+bedDirs <- bedDirs[endsWith(bedDirs, ".bed") & !grepl("merged", bedDirs)]
+
+bedFiles <- lapply(bedDirs, function(bed){bed <- fread(bed)})
+
+bedMergedFiles <- rbindlist(bedFiles)
+mergedFilePath <- file.path(bedBaseDir, paste0("merged", ".bed"))
+write.table(bedMergedFiles, 
+            mergedFilePath, 
+            quote=FALSE, col.names=FALSE,
+            sep="\t", 
+            row.names=FALSE)  
+```
+
+Merge bed file bash
+```{bash engine.opts='-l', eval=TRUE}
+cd $bedBaseDir
+cat -u *_sorted.bed > merged.bed
+```
+
+Call peaks on merged fragments
+```{bash engine.opts='-l', eval=TRUE}
+cd $bedBaseDir
+nice -n 3 macs2 callpeak --outdir ../peaks -f BEDPE -n merged -t merged.bed
+```
+
+# Sessioninfo 
+
+```{r}
+print(sessionInfo())
+```
+
+

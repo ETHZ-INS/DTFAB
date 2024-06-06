@@ -34,7 +34,7 @@ getMethods <- function(onlyTop=FALSE){
              "fastMLM"))
   return(c( "chromVAR", "monaLisa", "StabSel", "GSEA", "decoupleR", 
             "VIPER", "VIPERb", "msVIPER", "msVIPERb", "fastMLM",
-            "ulm", "ulmB", "ulmGC", "regreg", "regregR", 
+            "ulm", "ulmB", "ulmGC", "regreg", "regregR", "meirlop",
             "BaGFoot", "MBA", "ATACseqTFEA", "decoupleR>limma" ))
 }
 
@@ -99,7 +99,10 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
                        forceRerun=FALSE, outSubfolder="runATAC_results",
                        readlist=NULL, DA.norm="TMM"){
   
-  methods <- match.arg(methods, several.ok = TRUE)
+  methods <- match.arg(methods, 
+                       several.ok=TRUE, 
+                       choices=union(getMethods(),
+                                     getMethods(onlyTop=TRUE)))
   
   suppressPackageStartupMessages({
     library(viper)
@@ -185,6 +188,9 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
                       spec=spec, scriptsFolder)
   universalmotif::write_meme(motifs, mypath("others/motifs.meme",outSubfolder),
                              overwrite=TRUE)
+  universalmotif::write_jaspar(motifs, mypath("others/motifs.jaspar",outSubfolder),
+                               overwrite=TRUE)
+  
   
   # use pmoi if available
   if(file.exists(pmoiPath <- mypath("others/pmoi.rds",outSubfolder)) && 
@@ -342,7 +348,7 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
   
   # Compute differentially accessible regions required to run monaLisa, StabSel, fGSEA, VIPER, and msVIPER 
   
-  if (any(grepl("mona|Stab|GSEA|VIPER|decoupleR|ulm|regreg|TFEA",methods))){
+  if (any(grepl("mona|Stab|GSEA|VIPER|decoupleR|ulm|regreg|TFEA|meirlop",methods))){
     
     set.seed(rndSeed)
     npos <- sum(dataset$design == 1)
@@ -351,6 +357,11 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
     counts_perturbed <- counts[, colnames(counts)[(npos+1):(npos+nneg)]]
     DAR <- dATestedgeR(counts_control, 
                        counts_perturbed, norm.method=DA.norm)
+    
+    seqs <- getSeq(genome, as(row.names(DAR),"GRanges"))
+    names(seqs) <- paste(row.names(DAR), round(DAR$logFC,3))
+    writeXStringSet(seqs, filepath=mypath("others/scored.fasta", outSubfolder))
+    rm(seqs)
     
     # Generate required matrix of logFCs
     DARmat <- as.numeric(DAR$logFC)
@@ -368,6 +379,13 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
   # Start running methods
   
   readouts <- list()
+  
+  
+  if("meirlop" %in% methods){
+    res <- runMeirlop(mypath("",outSubfolder))
+    saveRDS(res$raw, mypath("raw/meirlop_raw.rds",outSubfolder))
+    saveRDS(res$res, mypath("with_pvalues/meirlop.rds",outSubfolder))
+  }
   
   # Run ATACseqTFEA
   

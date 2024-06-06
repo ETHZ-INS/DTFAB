@@ -45,7 +45,7 @@ getBenchmarkMetrics <- function(dataset, path=head(dataset$truth,1),
   stopifnot(is.null(archetypes) || is.list(archetypes))
   stopifnot(is.list(interactors))
   # grab runtimes
-  fl <- list.files(file.path(path, resin, "raw"), full=TRUE)
+  fl <- list.files(file.path(path, resin, "raw"), pattern="\\.rds$", full=TRUE)
   names(fl) <- gsub("_raw\\.rds$","",basename(fl))
   rt <- sapply(fl, FUN=function(x){
     x <- readRDS(x)

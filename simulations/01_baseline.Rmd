@@ -1,0 +1,86 @@
+---
+title: "01_baseline"
+author: "Emanuel Sonder"
+date: "06 11 2023"
+output: html_document
+---
+
+```{r setup}
+library(Rsamtools)
+library(BiocParallel)
+library(GenomicAlignments)
+library(regioneR)
+library(BSgenome.Hsapiens.UCSC.hg38)
+library(MASS)
+library(mclust)
+library(Repitools)
+library(data.table)
+
+data.table::setDTthreads(2)
+source("./scripts/atacSignalSimulation.R")
+source("../Scripts/runMethods.R")
+source("../Scripts/compileBenchmark.R")
+```
+
+```{r, paths}
+outDir <- "./data/sim_data_es"
+bedBaseDir <- "./data/ATAC_beds"
+atacPeaksPath <- "./data/peaks/merged_peaks.narrowPeak"
+
+# Baseline samples 
+bedPaths <- paste(bedBaseDir, c("ENCFF495DQP.rds", "ENCFF130DND.rds", 
+                                "ENCFF447ZRG.rds", "ENCFF966ELR.rds",
+                                "ENCFF358GWK.rds", "ENCFF963YZH.rds"), sep="/")
+```
+
+```{r, copy files, eval=FALSE}
+file.copy("./data/ATAC_beds/ENCFF495DQP.bam_sorted.bed", "./data/data_baseline/seq_files/CTRL1.bed")
+file.copy("./data/ATAC_beds/ENCFF130DND.bam_sorted.bed", "./data/data_baseline/seq_files/CTRL2.bed")
+file.copy("./data/ATAC_beds/ENCFF447ZRG.bam_sorted.bed", "./data/data_baseline/seq_files/CTRL3.bed")
+file.copy("./data/ATAC_beds/ENCFF966ELR.bam_sorted.bed", "./data/data_baseline/seq_files/TRT1.bed")
+file.copy("./data/ATAC_beds/ENCFF358GWK.bam_sorted.bed", "./data/data_baseline/seq_files/TRT2.bed")
+file.copy("./data/ATAC_beds/ENCFF963YZH.bam_sorted.bed", "./data/data_baseline/seq_files/TRT3.bed")
+```
+
+# Benchmark 
+
+Run methods
+```{r, run methods, eval=TRUE}
+
+datasets <- list(list(truth="none",
+                      species="h", 
+                      type="sim",
+                      seqStyle="UCSC",
+                      peakFile="../peaks/merged_peaks.narrowPeak",
+                      folder="./data/data_baseline/",
+                      readType="bed"))
+names(datasets) <- "data_baseline"
+
+runAll(datasets, scriptsFolder="../../../Scripts", 
+       methods=c("chromVAR", "minaLisa.others", "monaLisa.zero", "StabSel", "fastMLM"), 
+       forceRerun=TRUE)
+```
+
+benchmark results
+```{r, compile benchmark, eval=FALSE}
+# change name of TF
+datasets <- lapply(datasets, function(ds){
+  if(grepl("ZN", ds$truth))
+  {
+    ds$truth <- "ZN143"
+  }
+  ds
+})
+
+interactors <- readRDS("../Scripts/allInteractors.rds")
+res <- compileBenchmark(datasets, interactors=interactors)
+saveRDS(res, "res_all_effect_strength.rds")
+```
+
+# Sessioninfo 
+
+```{r}
+print(sessionInfo())
+```
+
+

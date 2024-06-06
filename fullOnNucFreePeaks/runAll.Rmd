@@ -1,0 +1,24 @@
+---
+title: "Full frags on nucleosome-free peaks"
+author: "Pierre-Luc Germain"
+date: "10/9/2023"
+output: html_document
+---
+
+```{r}
+source("../Scripts/runMethods.R")
+datasets <- getDatasets(onlyPE = TRUE)
+methods <- c("chromVAR", 
+             "monaLisa", 
+             "VIPER", "VIPERb",
+             "msVIPER", "msVIPERb",
+             "StabSel", 
+             "ulm", "ulmB", "ulmGC",
+             "regreg", "regregR")
+res <- runAll(datasets, methods=methods, peakWidth=150)
+```
+
+```{r}
+sessionInfo()
+```
+

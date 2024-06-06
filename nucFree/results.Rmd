@@ -1,0 +1,68 @@
+---
+title: "Benchmark results"
+author: "Pierre-Luc Germain"
+date: "10/10/2023"
+output: html_document
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(ggplot2)
+})
+source("../Scripts/runMethods.R")
+source("../Scripts/compileBenchmark.R")
+source("../Scripts/plot.R")
+interactors <- readRDS("../Scripts/allInteractors.rds")
+```
+
+```{r, eval=FALSE}
+res <- compileBenchmark(getDatasets(TRUE), interactors=interactors)
+saveRDS(res, "results.rds")
+```
+
+
+```{r}
+res <- readRDS("results.rds")
+```
+
+
+```{r, fig.width=5, fig.height=3.5}
+rankHeatmap2(res)
+```
+
+
+```{r, fig.width=10, fig.height=8}
+plotAllMetrics(res)
+```
+
+Compare t-values of chromVar variants
+
+```{r}
+fl <- system("ls */runATAC_results/with_pvalues/CV*", intern = TRUE)
+d <- data.frame(TF=dirname(dirname(dirname(fl))), method=gsub("\\.rds","",basename(fl)))
+res2 <- lapply(fl, readRDS)
+d$t <- sapply(seq_along(res2), FUN=function(i){
+  x <- res2[[i]]
+  abs(x[which(row.names(x)==d$TF[i]),"t"])
+})
+d2 <- reshape2::dcast(d, TF~method, value.var="t")
+ggplot(d2, aes(CV, CVcentered, label=TF)) + geom_abline(slope=1, col="grey") + geom_point() + scale_x_sqrt() + scale_y_sqrt() + ggrepel::geom_text_repel(min.segment.length = 0) + theme_bw()
+ggplot(d2, aes(CV, CVqt, label=TF)) + geom_abline(slope=1, col="grey") + geom_point() + scale_x_sqrt() + scale_y_sqrt() + ggrepel::geom_text_repel(min.segment.length = 0) + theme_bw()
+```
+
+Check whether the impact of Qtnorm depends on how the distributions look like:
+
+```{r, fig.width=6, fig.height=6}
+names(tfs) <- tfs <- c("BANP","GATA1","ESR1","KLF1")
+ad <- dplyr::bind_rows(lapply(tfs, FUN=function(x){
+  dev <- readRDS(file.path(x,"/runATAC_results/raw/CVnorm_raw.rds"))[[3]]
+  dev$condition <- rep(c("ctrl","perturbed"), each=ncol(dev)/2)
+  dev$relDepth <- scale(dev$depth)
+  sechm::meltSE(dev, row.names(dev))
+}), .id="Dataset")
+ggplot(ad, aes(z, group=sample, colour=condition)) + geom_density(linewidth=1) + 
+  facet_wrap(~Dataset, scales="free_y") + coord_cartesian(xlim=c(-15,15)) + 
+  theme_bw() + theme(legend.position = "none")
+```
+KLF1 shows no change, and has no shift... BANP and GATA1 are improved, and show shifts, while ESR1 isn't improved and shows distributions with different shapes
+

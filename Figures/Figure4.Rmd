@@ -1,0 +1,172 @@
+---
+title: "Figure 3"
+output: html_document
+---
+
+```{r setup}
+library(ggplot2)
+library(cowplot)
+library(data.table)
+library(patchwork)
+library(RColorBrewer)
+library(ggpointdensity)
+library(viridis)
+library(ggrepel)
+library(patchwork)
+library(limma)
+library(ggh4x)
+library(ggpubr)
+library(ggimage)
+library(stringr)
+library(png)
+
+
+source("../Scripts/plot.R")
+source("../Scripts/runMethods.R")
+source("../Scripts/compileBenchmark.R")
+source("../Scripts/getpmoi.R")
+cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", 
+                "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+```
+
+
+```{r, error=TRUE}
+# Import method outputs
+rawFiles <- list.files("../simulations/data/sim_data_es", recursive=TRUE, full.names=TRUE)
+rawFiles <- rawFiles[grepl("with_pvalues", rawFiles)]
+rawFiles <- rawFiles[!grepl("_0_", rawFiles)]
+
+res <- lapply(rawFiles, readRDS)
+res <- lapply(res, as.data.table, keep.rownames=TRUE)
+names(res) <- rawFiles
+
+# organize               
+res <- rbindlist(res, idcol="folder", use.names=TRUE, fill=TRUE)
+res[,setting:=tstrsplit(folder, split="/", keep=5)]
+res[,c("tf", "paradigm", "es"):=tstrsplit(setting, keep=1:3, split="_")]
+res[,method:=tstrsplit(folder, keep=8, split="/")]
+res[,method:=tstrsplit(method, keep=1, split=".", fixed=TRUE)]
+
+# get baseline peformances (es==0)
+baseLineFile <- list.files("../simulations/data/data_baseline", recursive=TRUE, full.names=TRUE)
+baseLineFile <- baseLineFile[grepl("with_pvalues", baseLineFile)]
+resBase <- lapply(baseLineFile, readRDS)
+resBase <- lapply(resBase, as.data.table, keep.rownames=TRUE)
+names(resBase) <- baseLineFile
+resBase <- rbindlist(resBase, idcol="folder", use.names=TRUE, fill=TRUE)
+resBase[,method:=tstrsplit(folder, keep=7, split="/")]
+resBase[,method:=tstrsplit(method, keep=1, split=".", fixed=TRUE)]
+
+params <- as.data.table(expand.grid(tf=c("CEBPB", "CTCF", "MAZ", "ZNF143"),
+                                    paradigm=c("activation", "haploinsufficiency")))
+resBase <- lapply(1:nrow(params), function(i){
+  tf <- params[i,]$tf
+  paradigm <- params[i,]$paradigm
+  resBase$tf <- tf
+  resBase$es <- 0
+  resBase$paradigm <- paradigm
+  resBase
+})
+resBase <- rbindlist(resBase)
+res <- rbind(res, resBase, use.names=TRUE, fill=TRUE)
+res <- renameMethods(res)
+
+# calculate ranks
+res[,rank:=order(p, -abs(logFC)), , by=c("tf", "paradigm", "es", "method")]
+resSub <- subset(res, rn %in% c("CEBPB", "MAZ", "ZNF143", "ZN143", "CTCF"))
+resSub <- subset(resSub, rn==tf | c(rn=="ZN143" & tf=="ZNF143"))
+resSub[,is_sig:=padj<=0.05]
+resSub <- subset(resSub, method!="msVIPER")
+resSim <- resSub
+
+# plot peformance on activation datasets
+pact <- ggplot(subset(resSub, paradigm=="activation"), 
+              aes(x=es, y=rank, group=method)) +
+geom_line()+
+geom_label(subset(resSub, paradigm=="activation"), 
+           mapping=aes(label=rank, x=es, y=rank, 
+                       color=padj, size=is_sig), label.size=1)+
+geom_text(subset(resSub, is_sig & paradigm=="activation"), 
+          mapping=aes(label=rank, x=es, y=rank), color="black", 
+          label.size=NA, size=4.2, fontface=2)+ # size=5
+facet_grid(rows=vars(tf), cols=vars(method), scales="free")+
+scale_color_viridis(option="D", direction=-1, name="adjusted p-value  ")+
+scale_size_manual(values = c("TRUE"=4.2, "FALSE"=4.2),
+                  name="significant")+
+guides(size=guide_legend(override.aes = list(fontface=c(1, 2))))+ # label=c("FALSE", "TRUE")
+xlab("Pertubation Strength")+
+ylab("Rank of True motif")+
+ggtitle("Activation")+
+labs(tag = "C")+
+scale_y_sqrt()+
+theme_bw()+
+theme(legend.position="bottom",
+      axis.title=element_text(size=14),
+      legend.title=element_text(size=12),
+      legend.text=element_text(size=10))
+
+# plot peformance on haploinsufficiency datasets
+phap <- ggplot(subset(resSub, paradigm=="haploinsufficiency"), 
+              aes(x=es, y=rank, group=method)) +
+geom_line()+
+geom_label(subset(resSub, paradigm=="haploinsufficiency"), 
+           mapping=aes(label=rank, x=es, y=rank, 
+                       color=padj, size=is_sig), label.size=1)+
+geom_text(subset(resSub, is_sig & paradigm=="haploinsufficiency"), 
+          mapping=aes(label=rank, x=es, y=rank), color="black", 
+          label.size=NA, size=4.2, fontface=2)+ # size=5
+facet_grid(rows=vars(tf), cols=vars(method), scales="free")+
+scale_color_viridis(option="D", direction=-1, name="adjusted p-value  ")+
+scale_size_manual(values = c("TRUE"=4.2, "FALSE"=4.2),
+                  name="significant")+
+guides(size=guide_legend(override.aes = list(fontface=c(1, 2))))+ # label=c("FALSE", "TRUE")
+xlab("Pertubation Strength")+
+ylab("Rank of True motif")+
+ggtitle("Haploinsufficiency")+
+scale_y_sqrt()+
+theme_bw()+
+theme(legend.position="bottom",
+      axis.title=element_text(size=14),
+      legend.title=element_text(size=12),
+      legend.text=element_text(size=10))
+
+es_perform <- (pact / phap) + #plot_annotation(tag_levels=list(c("B", "C")))+
+  plot_layout(guides = "collect") &
+  theme(plot.tag = element_text(face="bold", size=16), legend.position="bottom",
+        legend.key.width = unit(1, "cm"))
+```
+
+```{r}
+scheme <- ggdraw() + draw_image("main_sim_scheme.png") + labs(tag="A") +
+    theme(plot.tag = element_text(face="bold", size=16), plot.margin=unit(c(0,0,0,0), "pt"))
+
+act <- readRDS("../simulations/data/activation.rds")
+hap <- readRDS("../simulations/data/haploinsufficiency.rds")
+act[,enr:=scale(enr)]
+act$type <- "activation"
+hap[,enr:=scale(enr)]
+hap$type <- "haploinsufficiency"
+
+lfc <- rbind(act, hap)
+
+lfcDist <- ggplot(lfc, aes(x=enr, y=lfc))+
+  facet_grid(cols=vars(type), scales="free")+
+  geom_pointdensity()+
+  geom_hline(yintercept=0, linetype="dashed")+
+  scale_color_viridis(option="A")+
+  ylab("Log fold change")+
+  xlab("Enrichment over input")+
+  labs(tag="B")+
+  theme_bw()+
+  theme(legend.position="bottom",
+        strip.text = element_text(size=12),
+        plot.tag = element_text(face="bold", size=16))
+```
+
+
+```{r, fig.width=13.5, fig.height=16}
+pdf("Figure4.pdf", width=13.5, height=16)
+((scheme + free(lfcDist) + plot_layout(widths=c(4,3.3))) / es_perform) + 
+  plot_layout(heights = c(1.2,3))
+dev.off()
+```
