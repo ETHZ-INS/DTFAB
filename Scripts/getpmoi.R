@@ -76,7 +76,7 @@ getpmoi <- function(genome,
                     peaks,
                     spec=c("Hsapiens","Mmusculus"),
                     seqStyle=c("ensembl","UCSC"),
-                    srcFolder){
+                    srcFolder, motifs=NULL){
   seqStyle <- match.arg(seqStyle)
   
   if(is.character(peaks)){
@@ -89,8 +89,10 @@ getpmoi <- function(genome,
   peak_seqs <- get_sequence(peaks, genome)
   
   # Get the motifs in universal format required by memes
-  motifs <- getNonRedundantMotifs("universal", species = spec)
-  motifs <- fixMotifs(motifs, spec, srcFolder)
+  if(is.null(motifs)){
+    motifs <- getNonRedundantMotifs("universal", species = spec)
+    motifs <- fixMotifs(motifs, spec, srcFolder)
+  }
   
   # Obtain the positions of motif instances which are later required as input for runATAC
   pmoi <- runFimo(peak_seqs, 
