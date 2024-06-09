@@ -37,6 +37,12 @@ names(merged) <- sapply(cl, FUN=paste, collapse="/")
 # check the merge:
 cc2 <- universalmotif::compare_motifs(merged, score.strat = "wa.mean")
 ComplexHeatmap::Heatmap(cc2, show_row_names=FALSE, show_column_names=FALSE)
+
+merged <- lapply(merged, FUN=function(x){
+  if(x@strand=="*") x@strand <- "+-"
+  convert_motifs(x)
+})
+
 saveRDS(merged, "mergedMotifs.mouse.rds")
 ```
 
@@ -63,6 +69,12 @@ names(merged) <- sapply(cl, FUN=paste, collapse="/")
 cc2 <- universalmotif::compare_motifs(merged, score.strat = "wa.mean")
 cc2[is.na(cc2)] <- 0
 ComplexHeatmap::Heatmap(cc2, show_row_names=FALSE, show_column_names=FALSE)
+
+merged <- lapply(merged, FUN=function(x){
+  if(x@strand=="*") x@strand <- "+-"
+  convert_motifs(x)
+})
+
 saveRDS(merged, "mergedMotifs.human.rds")
 ```
 
