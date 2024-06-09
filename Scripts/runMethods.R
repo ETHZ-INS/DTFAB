@@ -192,11 +192,11 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
   }else{
     motifs <- fixMotifs(getNonRedundantMotifs("universal", spec=spec),
                         spec=spec, scriptsFolder)
-  }
-  universalmotif::write_meme(motifs, mypath("others/motifs.meme",outSubfolder),
-                             overwrite=TRUE)
-  universalmotif::write_jaspar(motifs, mypath("others/motifs.jaspar",outSubfolder),
+    universalmotif::write_meme(motifs, mypath("others/motifs.meme",outSubfolder),
                                overwrite=TRUE)
+    universalmotif::write_jaspar(motifs, mypath("others/motifs.jaspar",outSubfolder),
+                               overwrite=TRUE)
+  }
   
   # use pmoi if available
   if(file.exists(pmoiPath <- mypath("others/pmoi.rds",outSubfolder)) && 
@@ -205,7 +205,7 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
   }else{
     pmoi <- getpmoi(genome=genome,
                     peaks=peaks,
-                    spec=spec,
+                    spec=spec, motifs=motifs,
                     seqStyle=seqStyle, srcFolder=scriptsFolder)
     saveRDS(pmoi, pmoiPath)
   }
