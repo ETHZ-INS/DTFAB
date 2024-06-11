@@ -23,7 +23,9 @@ compileBenchmark <- function(datasets, rootPath=".", resin="runATAC_results",
     print(dn)
     tryCatch(
       res[[dn]] <- getBenchmarkMetrics(ds, file.path(rootPath, dn),
-                                       interactors=interactors, archetypes=archs),
+                                       interactors=interactors,
+                                       archetypes=archs,
+                                       archetypeLevel=archetypeLevel),
       error=function(e){
         message(e);
         #traceback()
@@ -85,11 +87,13 @@ getBenchmarkMetrics <- function(dataset, path=head(dataset$truth,1),
   res <- lapply(fl, readRDS)
   res <- res[sapply(res, FUN=function(x) isTRUE(nrow(x)>1))]
   
-  res <- dplyr::bind_rows(lapply(res, FUN=function(x){
+  res <- lapply(res, FUN=function(x){
     if(archetypeLevel){
+      stopifnot(!is.null(archetypes))
       # find the archetypes matching the truth
-      dataset$truth <- unique(unlist(lapply(dataset$truth, FUN=function(e){
-        grep(paste0("/",x,"/|^",x,"/|/",x,"$|^",x,"$"), row.names(e), value=TRUE)
+      an <- names(archetypes[[dataset$species]])
+      dataset$truth <- unique(unlist(lapply(dataset$truth, FUN=function(y){
+        grep(paste0("/",y,"/|^",y,"/|/",y,"$|^",y,"$"), an, value=TRUE)
       })))
       archetypes <- NULL
     }
@@ -102,9 +106,11 @@ getBenchmarkMetrics <- function(dataset, path=head(dataset$truth,1),
       m$archRelAUC <- m2$relAUC
       m3 <- .getArchMetrics(x, dataset$truth, cofactors=interactors,
                             archetypes=archetypes[[dataset$species]])
-      cbind(m, m3)
+      m <- cbind(m, m3)
     }
-  }), .id="method")
+    m
+  })
+  res <- dplyr::bind_rows(res, .id="method")
   res$elapsed <- rt[res$method, "elapsed"]
   res$cpu <- rt[res$method, "cpu"]
   res

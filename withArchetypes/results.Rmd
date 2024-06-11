@@ -6,9 +6,6 @@ output: html_document
 ---
 
 ```{r}
-suppressPackageStartupMessages({
-  library(ggplot2)
-})
 source("../Scripts/compileBenchmark.R")
 source("../Scripts/runMethods.R")
 source("../Scripts/plot.R")
@@ -17,9 +14,9 @@ archs <- list(h=readRDS("../misc/mergedMotifs.human.rds"),
               m=readRDS("../misc/mergedMotifs.mouse.rds"))
 ```
 
-```{r, eval=FALSE}
+```{r}
 datasets <- getDatasets()
-res <- compileBenchmark(datasets, interactors=interactors, archetypes = archs)
+res <- compileBenchmark(datasets, interactors=interactors, archetypes = archs, archetypeLevel=TRUE)
 res <- renameMethods(res)
 saveRDS(res, file="results.rds")
 ```
