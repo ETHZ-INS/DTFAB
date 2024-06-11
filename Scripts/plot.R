@@ -59,8 +59,8 @@ sensFDRplot <- function(res, fade=NULL, PR=TRUE, hull=TRUE, label.size=3.5, long
                              res$method, ignore.case=TRUE), "LFC-based", "sample-wise")
   }
   cols <- setNames(c("#CC6677", "#4477AA"), unique(res$type))
-  res2 <- aggregate(res[,c("Sensitivity", "FDR","archFDR")], by=res[,c("method","type")],
-                    na.rm=TRUE, FUN=mean)
+  res2 <- aggregate(res[,intersect(c("Sensitivity", "FDR","archFDR"),colnames(res))],
+                    by=res[,c("method","type")], na.rm=TRUE, FUN=mean)
   if(useArch){
     res2$precision <- 1-res2$archFDR
   }else{

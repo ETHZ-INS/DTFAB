@@ -14,110 +14,39 @@ suppressPackageStartupMessages({
 })
 source("../Scripts/plot.R")
 source("../Scripts/runMethods.R")
-res <- readRDS("../fullFrags/results.rds")
+res <- readRDS("../withArchetypes/results.rds")
 res <- renameMethods(res)
+res <- res[which(!(res$method %in% c("Ridge-lm", # redundant with lasso
+                                     "GCsmooth>fastMLM>limma"))),] # show in a later step
+# remove non-basic chromvar/monalisa variants
+res <- res[!grepl("scale|center|deviations|>Qt>|fewer|smaller|spearman|udt",res$method),]
+res$relAUC[is.na(res$relAUC)] <- ifelse(is.na(res$rank[which(is.na(res$relAUC))]), NA, 0)
 ```
 
 
+```{r, fig.width=8, fig.height=8.5}
+ro <- rev(getOrder(res, values=c("sqrtRank","relAUC")))
+co <- getOrder(res, values=c("sqrtRank","relAUC"), columns=TRUE)
+h1 <- rankHeatmap2(res, doDraw=FALSE, column_title="Rank of true TF", row_names_gp=gpar(fontsize=10), row_order=ro, column_order = co, rankBreaks = c(1,10,30,60,100))
+h2 <- suppressWarnings(relAUCplot2(res, row_order=ro, doDraw=FALSE,
+                  column_title="Network score", column_order=co))
+h <- grid.grabExpr(draw(h1 + h2, merge=TRUE))
 
-```{r}
-aTheme <- theme_bw() + theme(legend.position ="none", title=element_text(size=10),
-                             plot.title=element_text(size=10.5))
-
-diff2Type <- function(x){
-  factor(sign(x), c("-1","0","1"), c("worsened","same","improved"))
-}
-
-
-CVlimma <- res[which(res$method %in% c("chromVAR(deviations)>limma","chromVAR:differentialDeviations")),]
-cv1 <- reshape2::dcast(CVlimma, formula = dataset~method, value.var = "rank")
-cv1$diffsign <- diff2Type(cv1$`chromVAR:differentialDeviations`-cv1$`chromVAR(deviations)>limma`)
-typecols <- setNames(c("red","black","darkblue"),levels(cv1$diffsign))
-
-p1 <- ggplot(ranks, aes(TMM, GCsmoothQuantile, label=dataset, colour=type)) +
-  geom_abline(slope=1, colour="grey", linetype="dashed") + geom_point() + 
-  ggrepel::geom_text_repel(min.segment.length=0, size=2.5, alpha=0.6) + 
-  scale_colour_manual(values=typecols) +
-  facet_wrap(~method) + scale_y_log10() + scale_x_log10() + theme_bw() +
-  theme(legend.position = "bottom") + 
-  labs(x="Rank of true motif, using standard (TMM) normalization",
-       y="Rank of true motif, using smooth quantile normalization",
-       colour="Change in using smooth quantile normalization:") +
-  guides(colour=guide_legend(override.aes=list(size=3)))
-
-p1 <- ggplot(cv1, aes(`chromVAR:differentialDeviations`, `chromVAR(deviations)>limma`, label=dataset, colour=diffsign)) + 
-        geom_abline(slope=1, colour="grey") + geom_point() + 
-        ggrepel::geom_text_repel(min.segment.length=0, size=3, alpha=0.7) + 
-        scale_x_log10() + scale_y_log10() + aTheme +
-        scale_colour_manual(values=typecols) +
-        labs(x="Rank of true motif in chromVAR::differentialDeviations",
-             y="Rank of true motif in\nchromVAR(deviations)>limma") +
-        ggtitle("chromVAR>limma outperforms native\nchromVAR differential analysis")
-
-CVlimma <- res[which(res$method %in% c("chromVAR(deviations)>limma","chromVAR(z)>Qt>limma")),]
-cv1 <- reshape2::dcast(CVlimma, formula = dataset~method, value.var = "rank")
-cv1$diffsign <- diff2Type(cv1$`chromVAR(deviations)>limma`-cv1$`chromVAR(z)>Qt>limma`)
-p2 <- ggplot(cv1, aes(`chromVAR(deviations)>limma`, `chromVAR(z)>Qt>limma`, label=dataset, colour=diffsign)) + 
-        geom_abline(slope=1, colour="grey") + geom_point() + 
-        ggrepel::geom_text_repel(min.segment.length=0, size=3, alpha=0.7) + 
-        scale_x_log10() + scale_y_log10() + aTheme +
-        scale_colour_manual(values=typecols) +
-        labs(x="Rank of true motif in chromVAR(deviations)>limma",
-             y="Rank of true motif in\nchromVAR(z)>Qt>limma") +
-        ggtitle("Differential analysis on normalized z-scores\nis preferable to using the adjusted deviations")
-```
-
-```{r, fig.height=6, fig.width=8}
-resFoN <- readRDS("../fullOnNucFreePeaks/results.rds")
-resFoN <- renameMethods(resFoN)
-resNF <- readRDS("../nucFree/results.rds")
-resNF <- renameMethods(resNF)
-resNFoF <- readRDS("../NFonFull/results.rds")
-resNFoF <- renameMethods(resNFoF)
-m <- merge(resFoN, resNF, by=c("dataset", "method"), suffix=c(".FoNF",".NF"))
-m2 <- merge(res, resNFoF, by=c("dataset","method"), suffix=c("",".NFoF"))
-m <- merge(m, m2, by=c("dataset","method"))
-m <- m[m$method %in% c("chromVAR(z)>limma","monaLisa.vsOthers"),]
-m$diffsign <- diff2Type(-sign(m$rank.FoNF-m$rank))
-p3 <- ggplot(m, aes(rank, rank.FoNF, label=dataset, colour=diffsign)) + 
-    geom_abline(slope=1, colour="grey") + geom_point() + 
-    ggrepel::geom_text_repel(min.segment.length=0, size=3, alpha=0.7, show.legend=FALSE) + 
-  facet_wrap(~method) + scale_x_log10() + scale_y_log10() + aTheme + 
-    scale_colour_manual(values=typecols) +
-    labs(x="Rank of true motif (using all fragments)",
-         y="Rank of true motif\n(all frags on NF peaks)",
-         colour="Change (in y relative to x):",
-         title="Specifically using nucleosome-free fragments does not generally improve results")
-m$diffsign <- diff2Type(-sign(m$rank.NF-m$rank))
-p4 <- ggplot(m, aes(rank, rank.NF, label=dataset, colour=diffsign)) + 
-    geom_abline(slope=1, colour="grey") + geom_point() + 
-    ggrepel::geom_text_repel(min.segment.length=0, size=3, alpha=0.7) + 
-  facet_wrap(~method) + scale_x_log10() + scale_y_log10() + aTheme +
-    scale_colour_manual(values=typecols) +
-    labs(x="Rank of true motif (using all fragments)", y="Rank of true motif\n(only NF frags on NF peaks)")
-m$diffsign <- diff2Type(-sign(m$rank.NFoF-m$rank))
-p5 <- ggplot(m, aes(rank, rank.NFoF, label=dataset, colour=diffsign)) + 
-    geom_abline(slope=1, colour="grey") + geom_point() + 
-    ggrepel::geom_text_repel(min.segment.length=0, size=3, alpha=0.7) + 
-  facet_wrap(~method) + scale_x_log10() + scale_y_log10() + aTheme +
-    scale_colour_manual(values=typecols) +
-    labs(x="Rank of true motif (using all fragments)", y="Rank of true motif\n(only NF fragments)")
-```
-
-
-```{r, fig.width=7.8, fig.height=8.5}
-fig <- plot_grid(
-  plot_grid(p1,p2, nrow=1, scale=0.95, labels="AUTO"),
-  get_legend(p3 + theme(legend.position = "bottom") + 
-               guides(colour=guide_legend(override.aes=list(size=3)))),
-  p3, p4, p5, nrow=5, scale=c(1,1,0.95,0.95,0.95), labels=c(NA,NA,"C","D","E"),
-  rel_heights=c(1.1,0.15,1.1,1,1)
+res <- readRDS("../withArchetypes/results.rds")
+res2 <- filterMethods(res, rename=FALSE)
+res2$method <- gsub(":","",res2$method)
+pr <- sensFDRplot(res2, useArch = FALSE) + 
+  ggtitle("Top variant per method, at nominal p.adjust <= 0.5") +
+  theme(plot.title=element_text(size=11),
+        axis.title=element_text(size=10))
+fig <- cowplot::plot_grid( h, pr,
+  nrow=2, labels=LETTERS[1:2], scale=c(0.95), rel_heights = c(6,3)
 )
 fig
 ```
 
 ```{r}
-pdf("Figure2.pdf", width=7.8, height=8.5)
+pdf("Figure2.pdf", width=8, height=8.5)
 fig
 dev.off()
 ```

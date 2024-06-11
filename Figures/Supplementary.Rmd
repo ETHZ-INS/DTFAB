@@ -194,6 +194,123 @@ the two metrics.
 \newpage
 
 
+# `r getFigNb(TRUE)`
+
+```{r}
+source("../Scripts/plot.R")
+source("../Scripts/runMethods.R")
+res <- readRDS("../fullFrags/results.rds")
+res <- renameMethods(res)
+
+aTheme <- theme_bw() + theme(legend.position ="none", title=element_text(size=10),
+                             plot.title=element_text(size=10.5))
+
+diff2Type <- function(x){
+  factor(sign(x), c("-1","0","1"), c("worsened","same","improved"))
+}
+
+
+CVlimma <- res[which(res$method %in% c("chromVAR(deviations)>limma","chromVAR:differentialDeviations")),]
+cv1 <- reshape2::dcast(CVlimma, formula = dataset~method, value.var = "rank")
+cv1$diffsign <- diff2Type(cv1$`chromVAR:differentialDeviations`-cv1$`chromVAR(deviations)>limma`)
+typecols <- setNames(c("red","black","darkblue"),levels(cv1$diffsign))
+
+# p1 <- ggplot(ranks, aes(TMM, GCsmoothQuantile, label=dataset, colour=type)) +
+#   geom_abline(slope=1, colour="grey", linetype="dashed") + geom_point() + 
+#   ggrepel::geom_text_repel(min.segment.length=0, size=2.5, alpha=0.6) + 
+#   scale_colour_manual(values=typecols) +
+#   facet_wrap(~method) + scale_y_log10() + scale_x_log10() + theme_bw() +
+#   theme(legend.position = "bottom") + 
+#   labs(x="Rank of true motif, using standard (TMM) normalization",
+#        y="Rank of true motif, using smooth quantile normalization",
+#        colour="Change in using smooth quantile normalization:") +
+#   guides(colour=guide_legend(override.aes=list(size=3)))
+
+p1 <- ggplot(cv1, aes(`chromVAR:differentialDeviations`, `chromVAR(deviations)>limma`, label=dataset, colour=diffsign)) + 
+        geom_abline(slope=1, colour="grey") + geom_point() + 
+        ggrepel::geom_text_repel(min.segment.length=0, size=3, alpha=0.7) + 
+        scale_x_log10() + scale_y_log10() + aTheme +
+        scale_colour_manual(values=typecols) +
+        labs(x="Rank of true motif in chromVAR::differentialDeviations",
+             y="Rank of true motif in\nchromVAR(deviations)>limma") +
+        ggtitle("chromVAR>limma outperforms native\nchromVAR differential analysis")
+
+CVlimma <- res[which(res$method %in% c("chromVAR(deviations)>limma","chromVAR(z)>Qt>limma")),]
+cv1 <- reshape2::dcast(CVlimma, formula = dataset~method, value.var = "rank")
+cv1$diffsign <- diff2Type(cv1$`chromVAR(deviations)>limma`-cv1$`chromVAR(z)>Qt>limma`)
+p2 <- ggplot(cv1, aes(`chromVAR(deviations)>limma`, `chromVAR(z)>Qt>limma`, label=dataset, colour=diffsign)) + 
+        geom_abline(slope=1, colour="grey") + geom_point() + 
+        ggrepel::geom_text_repel(min.segment.length=0, size=3, alpha=0.7) + 
+        scale_x_log10() + scale_y_log10() + aTheme +
+        scale_colour_manual(values=typecols) +
+        labs(x="Rank of true motif in chromVAR(deviations)>limma",
+             y="Rank of true motif in\nchromVAR(z)>Qt>limma") +
+        ggtitle("Differential analysis on normalized z-scores\nis preferable to using the adjusted deviations")
+
+resFoN <- readRDS("../fullOnNucFreePeaks/results.rds")
+resFoN <- renameMethods(resFoN)
+resNF <- readRDS("../nucFree/results.rds")
+resNF <- renameMethods(resNF)
+resNFoF <- readRDS("../NFonFull/results.rds")
+resNFoF <- renameMethods(resNFoF)
+m <- merge(resFoN, resNF, by=c("dataset", "method"), suffix=c(".FoNF",".NF"))
+m2 <- merge(res, resNFoF, by=c("dataset","method"), suffix=c("",".NFoF"))
+m <- merge(m, m2, by=c("dataset","method"))
+m <- m[m$method %in% c("chromVAR(z)>limma","monaLisa.vsOthers"),]
+m$diffsign <- diff2Type(-sign(m$rank.FoNF-m$rank))
+p3 <- ggplot(m, aes(rank, rank.FoNF, label=dataset, colour=diffsign)) + 
+    geom_abline(slope=1, colour="grey") + geom_point() + 
+    ggrepel::geom_text_repel(min.segment.length=0, size=3, alpha=0.7, show.legend=FALSE) + 
+  facet_wrap(~method) + scale_x_log10() + scale_y_log10() + aTheme + 
+    scale_colour_manual(values=typecols) +
+    labs(x="Rank of true motif (using all fragments)",
+         y="Rank of true motif\n(all frags on NF peaks)",
+         colour="Change (in y relative to x):",
+         title="Specifically using nucleosome-free fragments does not generally improve results")
+m$diffsign <- diff2Type(-sign(m$rank.NF-m$rank))
+p4 <- ggplot(m, aes(rank, rank.NF, label=dataset, colour=diffsign)) + 
+    geom_abline(slope=1, colour="grey") + geom_point() + 
+    ggrepel::geom_text_repel(min.segment.length=0, size=3, alpha=0.7) + 
+  facet_wrap(~method) + scale_x_log10() + scale_y_log10() + aTheme +
+    scale_colour_manual(values=typecols) +
+    labs(x="Rank of true motif (using all fragments)", y="Rank of true motif\n(only NF frags on NF peaks)")
+m$diffsign <- diff2Type(-sign(m$rank.NFoF-m$rank))
+p5 <- ggplot(m, aes(rank, rank.NFoF, label=dataset, colour=diffsign)) + 
+    geom_abline(slope=1, colour="grey") + geom_point() + 
+    ggrepel::geom_text_repel(min.segment.length=0, size=3, alpha=0.7) + 
+  facet_wrap(~method) + scale_x_log10() + scale_y_log10() + aTheme +
+    scale_colour_manual(values=typecols) +
+    labs(x="Rank of true motif (using all fragments)", y="Rank of true motif\n(only NF fragments)")
+```
+
+
+```{r, fig.width=8, fig.height=8}
+plot_grid(
+  plot_grid(p1,p2, nrow=1, scale=0.95, labels="AUTO"),
+  get_legend(p3 + theme(legend.position = "bottom") + 
+               guides(colour=guide_legend(override.aes=list(size=3)))),
+  p3, p4, p5, nrow=5, scale=c(1,1,0.95,0.95,0.95), labels=c(NA,NA,"C","D","E"),
+  rel_heights=c(1.1,0.15,1.1,1,1)
+)
+```
+
+**`r getFigNb()`: Impact of modifications on top workflows.** 
+**A:** Comparison of the true motif ranks obtained by a *limma* analysis 
+on the chromVAR deviations, versus using chromVAR's native 
+*differentialDeviations*.
+**B:** Comparison of the true motif ranks obtained by a *limma* analysis on the 
+normalized chromVAR z-scores, versus on the chromVAR deviations.
+**C:** Comparison of the true motif ranks obtained by the top method of each 
+family of approaches, when using peaks called from nucleosome-free fragments 
+(but counting all fragments overlapping them).
+**D:** Comparison of the true motif ranks obtained by the top method of each 
+family of approaches, when using only nucleosome-free fragments. In each case, 
+the TFs in blue indicate an improvement, those in red a worsening, and those in 
+black no change.
+
+\newpage
+
+
 
 # `r getFigNb(TRUE)`
 
