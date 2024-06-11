@@ -286,9 +286,9 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
   
   # These will be turned into the motifs used for chromVAR and monaLisa later but first, they serve as donor of "wrong" TF names
   
-  motifs <- getNonRedundantMotifs(format = "PWMatrix", 
-                                  species = spec)
-  
+  motifs <- do.call(TFBSTools::PWMatrixList,
+                    setNames(universalmotif::convert_motifs(motifs, class="TFBSTools-PWMatrix"), names(motifs)))
+
   # Listing TF names we don't want (wrong)
   
   motiflist <- c()
