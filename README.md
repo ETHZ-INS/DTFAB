@@ -7,6 +7,7 @@ This repository contains the code used in Gerbaldo, Sonder et al., for the bench
 * **fullFrags**: benchmark on real datasets, using all fragments.
 * **nucFree**: benchmark on real datasets, using only nucleosome-free fragments.
 * **fullOnNucFreePeaks**: benchmark on real datasets, using counts of all fragments on nucleosome-free peaks.
+* **withArchetypes**: benchmark on real datasets, using motif archetypes.
 * **Scripts**: wrappers and higher-level functions.
 * **Figures**: code behind the paper's figures.
 * **simulations**: code for the generation of the semi-simulated datasets, and the benchmarks performed on those.

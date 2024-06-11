@@ -1,0 +1,20 @@
+---
+title: "Benchmark using all fragments"
+output: html_document
+---
+
+```{r}
+source("../Scripts/runMethods.R")
+datasets <- getDatasets()
+res <- runAll(datasets, useArchetypes=TRUE)
+```
+
+```{r}
+runCVariants(datasets)
+```
+
+
+```{r}
+sessionInfo()
+```
+

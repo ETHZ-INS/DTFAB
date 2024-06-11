@@ -1,0 +1,26 @@
+---
+title: "Benchmark results"
+author: "Pierre-Luc Germain"
+date: "10/10/2023"
+output: html_document
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(ggplot2)
+})
+source("../Scripts/compileBenchmark.R")
+source("../Scripts/runMethods.R")
+source("../Scripts/plot.R")
+interactors <- readRDS("../Scripts/allInteractors.rds")
+archs <- list(h=readRDS("../misc/mergedMotifs.human.rds"),
+              m=readRDS("../misc/mergedMotifs.mouse.rds"))
+```
+
+```{r, eval=FALSE}
+datasets <- getDatasets()
+res <- compileBenchmark(datasets, interactors=interactors, archetypes = archs)
+res <- renameMethods(res)
+saveRDS(res, file="results.rds")
+```
+
