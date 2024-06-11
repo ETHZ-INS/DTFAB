@@ -4,10 +4,15 @@
 #' @param path The path in which the datasets' results folders are
 #' @param resin The name of the results subfolder
 #' @param interactors A named list of interactors per TF
+#' @param archetypes An optional list of archetypes for each species. Each list
+#'  should itself be a list of archetypes, with each archetype being
+#'   a character vector of the motifs in it.
+#' @param archetypeLevel Logical; whether the motifs used were archetypes 
+#'   (default FALSE)
 #'
 #' @return A data.frame of compiled metrics
 compileBenchmark <- function(datasets, rootPath=".", resin="runATAC_results",
-                             interactors, archetypes){
+                             interactors, archetypes, archetypeLevel=FALSE){
   res <- list()
   for(dn in names(datasets)){
     ds <- datasets[[dn]]
@@ -37,11 +42,13 @@ compileBenchmark <- function(datasets, rootPath=".", resin="runATAC_results",
 #' @param archetypes An optional list of archetypes for each species. Each list
 #'  should itself be a list of archetypes, with each archetype being
 #'   a character vector of the motifs in it.
+#' @param archetypeLevel Logical; whether the motifs used were archetypes 
+#'   (default FALSE)
 #'
 #' @return A data.frame of compiled metrics for one dataset
 getBenchmarkMetrics <- function(dataset, path=head(dataset$truth,1),
                                 resin="runATAC_results", interactors,
-                                archetypes=NULL){
+                                archetypes=NULL, archetypeLevel=FALSE){
   stopifnot(is.null(archetypes) || is.list(archetypes))
   stopifnot(is.list(interactors))
   # grab runtimes
@@ -79,6 +86,13 @@ getBenchmarkMetrics <- function(dataset, path=head(dataset$truth,1),
   res <- res[sapply(res, FUN=function(x) isTRUE(nrow(x)>1))]
   
   res <- dplyr::bind_rows(lapply(res, FUN=function(x){
+    if(archetypeLevel){
+      # find the archetypes matching the truth
+      dataset$truth <- unique(unlist(lapply(dataset$truth, FUN=function(e){
+        grep(paste0("/",x,"/|^",x,"/|/",x,"$|^",x,"$"), row.names(e), value=TRUE)
+      })))
+      archetypes <- NULL
+    }
     m <- .getBenchmarkMetrics(x, truth=dataset$truth, interactors=interactors)
     if(!is.null(archetypes)){
       arch <- archetypes[[dataset$species]]
