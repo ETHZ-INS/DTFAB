@@ -30,11 +30,12 @@ cl <- lapply(cut(as.dendrogram(h), h=0.35)$lower, FUN=labels)
 # cl <- cluster_leiden(knn, resolution_parameter = 3, n_iterations = 10)
 # cl <- split(row.names(cc), cl$membership)
 
+names(cl) <- sapply(cl, FUN=paste, collapse="/")
+
 merged <- lapply(cl, FUN=function(x){
   if(length(x)==1) return(mo[[x]])
   merge_motifs(mo[x])
 })
-names(merged) <- sapply(cl, FUN=paste, collapse="/")
 # check the merge:
 cc2 <- universalmotif::compare_motifs(merged, score.strat = "wa.mean")
 ComplexHeatmap::Heatmap(cc2, show_row_names=FALSE, show_column_names=FALSE)
@@ -48,7 +49,7 @@ saveRDS(merged, "mergedMotifs.mouse.rds")
 
 topPerArch <- lapply(cl, FUN=function(x){
   x <- convert_motifs(mo[x])
-  x[head(order(-sapply(x, FUN=function(x) x@icscore)),1)]
+  x[[head(order(-sapply(x, FUN=function(x) x@icscore)),1)]]
 })
 
 saveRDS(topPerArch, "topMotifPerArchetype.mouse.rds")
@@ -80,12 +81,13 @@ cc[is.na(cc)] <- 0
 
 h <- hclust(as.dist(1-cc), method = "complete")
 cl <- lapply(cut(as.dendrogram(h), h=0.45)$lower, FUN=labels)
+names(cl) <- sapply(cl, FUN=paste, collapse="/")
 
 merged <- lapply(cl, FUN=function(x){
   if(length(x)==1) return(mo[[x]])
   merge_motifs(mo[x])
 })
-names(merged) <- sapply(cl, FUN=paste, collapse="/")
+
 # check the merge:
 cc2 <- universalmotif::compare_motifs(merged, score.strat = "wa.mean")
 cc2[is.na(cc2)] <- 0
@@ -100,7 +102,7 @@ saveRDS(merged, "mergedMotifs.human.rds")
 
 topPerArch <- lapply(cl, FUN=function(x){
   x <- convert_motifs(mo[x])
-  x[head(order(-sapply(x, FUN=function(x) x@icscore)),1)]
+  x[[head(order(-sapply(x, FUN=function(x) x@icscore)),1)]]
 })
 
 saveRDS(topPerArch, "topMotifPerArchetype.human.rds")
