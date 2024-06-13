@@ -24,7 +24,7 @@ rankHeatmap2 <- function(res, rankBreaks=c(1,10,30,75,150,300,600), ...,
     row_order <- row.names(rankm)[order(rowMeans(rankmImputed, na.rm=TRUE))]
   if(is.null(column_order))
     column_order <- names(sort(-colMeans(rankm, na.rm=TRUE)))
-  ancols <- list(type=c(deletion="darkorange3", dTag="black", ligand="darkslateblue"))
+  ancols <- list(type=c(CRISPRi="darkorange3", dTag="black", ligand="darkslateblue"))
   colan <- HeatmapAnnotation(df = datasetInfo[colnames(rankm),,drop=FALSE],
                              col=ancols, show_annotation_name=FALSE)
   bdist <- log10(rankBreaks[-1]-rankBreaks[-length(rankBreaks)])
@@ -168,7 +168,7 @@ relAUCplot2 <- function(res, doDraw=TRUE, column_title="Datasets", name=NULL,
   if(is.null(column_order)) column_order <- names(sort(colMeans(m, na.rm=TRUE)))
   if(is.null(row_order)) row_order <- row.names(m)[order(-rowMeans(m, na.rm=TRUE))]
 
-  ancols <- list(type=c(deletion="darkorange3", dTag="black", ligand="darkslateblue"),
+  ancols <- list(type=c(CRISPRi="darkorange3", dTag="black", ligand="darkslateblue"),
                  LFCbased=c("FALSE"="white", "TRUE"="brown4"))
   colan <- HeatmapAnnotation(df = datasetInfo[colnames(m),,drop=FALSE],
                              col=ancols, show_annotation_name=FALSE)
@@ -307,7 +307,7 @@ getMethodAnno <- function(methods){
     100*grepl("decoupleR",methods) + 1000*grepl("VIPER",methods)
   family <- factor(family, c(1,10,100,1000,0),
                    c("chromVAR", "monaLisa", "decoupleR", "VIPER", "other"))
-  ancols <- list(type=c(deletion="darkorange3", dTag="black", ligand="darkslateblue"),
+  ancols <- list(type=c(CRISPRi="darkorange3", dTag="black", ligand="darkslateblue"),
                  family=setNames(c("#332288", "#88CCEE", "#117733", "#DDCC77", "#CC6677"),
                                  levels(family)),
                  LFCbased=c("FALSE"="white", "TRUE"="brown4"))

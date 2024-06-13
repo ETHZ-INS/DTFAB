@@ -11,12 +11,12 @@ getDatasets <- function(onlyPE=FALSE){
   datasets <- list(
     BANP=list(truth="BANP", species="m", type="dTag"),
     ESR1=list(truth=c("ESR1","ESR2"), species="h", type="ligand"),
-    GATA1=list(truth=c("GATA1"), species="h", readType="bed", type="deletion"),
-    GATA2=list(truth=c("GATA2"), species="h", readType="bed", type="deletion"),
-    RUNX1=list(truth=c("RUNX1"), species="h", readType="bed", type="deletion"),
-    RUNX2=list(truth=c("RUNX2"), species="h", readType="bed", type="deletion"),
-    KLF1=list(truth=c("KLF1"), species="h", readType="bed", type="deletion"),
-    MYC=list(truth=c("MYC","MAX"), species="h", readType="bed", type="deletion"),
+    GATA1=list(truth=c("GATA1"), species="h", readType="bed", type="CRISPRi"),
+    GATA2=list(truth=c("GATA2"), species="h", readType="bed", type="CRISPRi"),
+    RUNX1=list(truth=c("RUNX1"), species="h", readType="bed", type="CRISPRi"),
+    RUNX2=list(truth=c("RUNX2"), species="h", readType="bed", type="CRISPRi"),
+    KLF1=list(truth=c("KLF1"), species="h", readType="bed", type="CRISPRi"),
+    MYC=list(truth=c("MYC","MAX"), species="h", readType="bed", type="CRISPRi"),
     NR1H3=list(truth=c("NR1H3"), species="m", type="ligand"),
     NR1H4=list(truth=c("NR1H4","RXRA","RXRB"), species="m", type="ligand"),
     NR3C1=list(truth=c("NR3C1","GCR"), species="h", type="ligand", paired=FALSE)
