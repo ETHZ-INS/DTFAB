@@ -11,6 +11,7 @@ suppressPackageStartupMessages({
   library(bluster)
   library(igraph)
 })
+source("../Scripts/runMethods.R")
 ```
 
 # mouse
@@ -44,6 +45,26 @@ merged <- lapply(merged, FUN=function(x){
 })
 
 saveRDS(merged, "mergedMotifs.mouse.rds")
+
+topPerArch <- lapply(cl, FUN=function(x){
+  x <- convert_motifs(mo[x])
+  x[head(order(-sapply(x, FUN=function(x) x@icscore)),1)]
+})
+
+saveRDS(topPerArch, "topMotifPerArchetype.mouse.rds")
+```
+
+```{r}
+mo2 <- c(merged, convert_motifs(mo))
+cc <- universalmotif::compare_motifs(mo2, nthreads = 10, score.strat = "wa.mean")
+cc[is.na(cc)] <- 0
+cc2 <- cc[grep("/",rownames(cc)),grep("/",rownames(cc),invert=TRUE)]
+cmax <- t(colMaxs(cc2))
+row.names(cmax) <- "Max"
+Heatmap(cc2, show_column_names = FALSE, show_row_names = FALSE, column_title="Motifs", row_title="Archetypes", name="WPearson") %v% 
+  Heatmap(cmax, show_column_names = FALSE, heatmap_height = unit(0.4, "cm"))
+
+cc3 <- cc2[,intersect(colnames(cc2),unique(unlist(lapply(getDatasets(), FUN=function(x) x$truth))))]
 ```
 
 
@@ -76,6 +97,13 @@ merged <- lapply(merged, FUN=function(x){
 })
 
 saveRDS(merged, "mergedMotifs.human.rds")
+
+topPerArch <- lapply(cl, FUN=function(x){
+  x <- convert_motifs(mo[x])
+  x[head(order(-sapply(x, FUN=function(x) x@icscore)),1)]
+})
+
+saveRDS(topPerArch, "topMotifPerArchetype.human.rds")
 ```
 
 ```{r}
