@@ -51,7 +51,7 @@ topPerArch <- lapply(cl, FUN=function(x){
   x <- convert_motifs(mo[x])
   x[[head(order(-sapply(x, FUN=function(x) x@icscore)),1)]]
 })
-
+for(f in names(topPerArch)) topPerArch[[f]]@name <- f
 saveRDS(topPerArch, "topMotifPerArchetype.mouse.rds")
 ```
 
@@ -104,7 +104,7 @@ topPerArch <- lapply(cl, FUN=function(x){
   x <- convert_motifs(mo[x])
   x[[head(order(-sapply(x, FUN=function(x) x@icscore)),1)]]
 })
-
+for(f in names(topPerArch)) topPerArch[[f]]@name <- f
 saveRDS(topPerArch, "topMotifPerArchetype.human.rds")
 ```
 

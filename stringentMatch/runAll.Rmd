@@ -1,0 +1,21 @@
+---
+title: "Benchmark using a more stringent motif matching"
+author: "Pierre-Luc Germain"
+output: html_document
+---
+
+```{r}
+source("../Scripts/runMethods.R")
+datasets <- getDatasets()
+res <- runAll(datasets, matchThresh=1e-6, minMatchScore=13, methods=c("chromVAR","fastMLM","monaLisa","StabSel"))
+```
+
+```{r}
+runCVariants(datasets)
+```
+
+
+```{r}
+sessionInfo()
+```
+

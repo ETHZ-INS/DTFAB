@@ -3,7 +3,7 @@
 runStabSel <- function(DAR,
                          motifs,
                          peaks,
-                         genome){
+                         genome, minMatchScore=10){
   ptm <- proc.time()
   
   # Adding peak logFCs to the peaks
@@ -22,7 +22,7 @@ runStabSel <- function(DAR,
   suppressWarnings({
     hits <- findMotifHits(query = motifs,
                         subject = DARseqs,
-                        min.score = 10.0,
+                        min.score = minMatchScore,
                         BPPARAM = MulticoreParam(8))
   })
 

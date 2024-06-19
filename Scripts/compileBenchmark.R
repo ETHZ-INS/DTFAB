@@ -95,6 +95,7 @@ getBenchmarkMetrics <- function(dataset, path=head(dataset$truth,1),
       dataset$truth <- unique(unlist(lapply(dataset$truth, FUN=function(y){
         grep(paste0("/",y,"/|^",y,"/|/",y,"$|^",y,"$"), an, value=TRUE)
       })))
+      dataset$truth <- c(dataset$truth, unlist(strsplit(dataset$truth,"/",fixed=TRUE)))
       archetypes <- NULL
     }
     m <- .getBenchmarkMetrics(x, truth=dataset$truth, interactors=interactors)

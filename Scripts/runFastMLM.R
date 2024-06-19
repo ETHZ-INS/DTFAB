@@ -5,6 +5,7 @@
 #' @param useIntercept Logical; whether to use an intercept in the mode
 #' @param poisson Logical; whether to use poisson regression (assumes `accmat`
 #'   is a count matrix).
+#' @param minMatches The minimum number of matches for a motif to be considered
 #' @param BPPARAM BiocParallel param for multithreading.
 #'
 #' @return A matrix (of `ncol(annotation)` rows and `ncol(accmat)` columns) with
@@ -16,9 +17,10 @@
 #' 
 #' @export
 fastMLM <- function(accmat, annotation, useIntercept=TRUE, poisson=FALSE,
-                    BPPARAM=BiocParallel::SerialParam()){
+                    minMatches=5L,BPPARAM=BiocParallel::SerialParam()){
   stopifnot(is.matrix(accmat) && is.matrix(annotation))
   if(useIntercept) annotation <- cbind(rep(1L,nrow(annotation)), annotation)
+  annotation <- annotation[,colSums(annotation)>=minMatches]
   res <- bplapply(seq_len(ncol(accmat)), BPPARAM=BPPARAM, FUN=function(i){
     if(!isTRUE(poisson)){
       mod <- RcppArmadillo::fastLmPure(annotation, accmat[,i])

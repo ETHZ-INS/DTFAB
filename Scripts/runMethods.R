@@ -34,7 +34,7 @@ getMethods <- function(onlyTop=FALSE){
              "fastMLM"))
   return(c( "chromVAR", "monaLisa", "StabSel", "GSEA", "decoupleR", 
             "VIPER", "VIPERb", "msVIPER", "msVIPERb", "fastMLM",
-            "ulm", "ulmB", "ulmGC", "regreg", "regregR", "meirlop",
+            "ulm", "ulmB", "ulmGC", "regreg", "regregR", #"meirlop",
             "BaGFoot", "MBA", "ATACseqTFEA", "decoupleR>limma" ))
 }
 
@@ -91,14 +91,19 @@ runAllMt <- function(datasets=getDatasets(), nthreads=3, ...){
 #' @param readlist Vector of paths to aligned files, otherwise will be detected 
 #'   from folder.
 #' @param DA.norm Normalization method to use for peak differential accessibility
-#' @param useArchetypes Logical; whether to use archetypes instead of motifs
+#' @param useArchetypes Logical; whether to use archetypes instead of motifs. 
+#'   Can also be "top", in which case the top motif per archetype is used.
+#' @param matchThresh The motif matching p-value threshold (default is FIMO's 
+#'   default, i.e. 1e-4)
+#' @param minMatchScore Minimum matching score for monaLisa and StabSel
 #' 
 #' @return A list of dataframes for each method (also saves them to disk)
 runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
                        methods=getMethods(), rndSeed=1997, peakWidth=300, 
                        decoupleR_modes=c("mlm", "ulm", "udt", "wsum"),
                        forceRerun=FALSE, outSubfolder="runATAC_results",
-                       readlist=NULL, DA.norm="TMM", useArchetypes=FALSE){
+                       readlist=NULL, DA.norm="TMM", useArchetypes=FALSE,
+                       matchThresh=NULL, minMatchScore=10, keepTop=NULL){
   
   methods <- match.arg(methods, 
                        several.ok=TRUE, 
@@ -185,9 +190,13 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
   seqlevelsStyle(peaks) <- seqStyle
   seqlevelsStyle(genome) <- seqStyle  
 
-  if(useArchetypes){
+  if(isTRUE(useArchetypes)){
     motifs <- ifelse(spec=="Hsapiens","mergedMotifs.human.rds",
                      "mergedMotifs.mouse.rds")
+    motifs <- readRDS(file.path(scriptsFolder,"..","misc",motifs))
+  }else if(useArchetypes=="top"){
+    motifs <- ifelse(spec=="Hsapiens","topMotifPerArchetype.human.rds",
+                     "topMotifPerArchetype.mouse.rds")
     motifs <- readRDS(file.path(scriptsFolder,"..","misc",motifs))
   }else{
     motifs <- fixMotifs(getNonRedundantMotifs("universal", spec=spec),
@@ -204,8 +213,8 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
     pmoi <- readRDS(pmoiPath)
   }else{
     pmoi <- getpmoi(genome=genome,
-                    peaks=peaks,
-                    spec=spec, motifs=motifs,
+                    peaks=peaks, keepTop=keepTop,
+                    spec=spec, motifs=motifs, thresh=matchThresh,
                     seqStyle=seqStyle, srcFolder=scriptsFolder)
     saveRDS(pmoi, pmoiPath)
   }
@@ -493,10 +502,8 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
   
   if ("monaLisa" %in% methods || "minaLisa.zero" %in% methods){
     
-    ML <- runmonaLisa(DAR, 
-                      motifs, 
-                      peaks, 
-                      genome, background="zeroBin")
+    ML <- runmonaLisa(DAR, motifs=motifs,  peaks=peaks, genome=genome,
+                      minMatchScore=minMatchScore, background="zeroBin")
     saveRDS(ML, "./runATAC_results/raw/MLzero_raw.rds")
     saveRDS(ML$df, "./runATAC_results/with_pvalues/MLzero.rds")
     readouts$MLzero <- ML$df
@@ -545,10 +552,8 @@ runMethods <- function(dataset, folder=".", scriptsFolder="../../Scripts",
   
   if ("StabSel" %in% methods){
     set.seed(rndSeed)
-    MLStabSel <- runStabSel(DAR, 
-                            motifs, 
-                            peaks, 
-                            genome)
+    MLStabSel <- runStabSel(DAR, motifs=motifs, peaks=peaks, genome=genome,
+                            minMatchScore=minMatchScore)
     
     saveRDS(MLStabSel, "./runATAC_results/raw/MLStabSel_raw.rds")
     

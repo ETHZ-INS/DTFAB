@@ -1,6 +1,6 @@
 runMeirlop <- function(path){
   ptm <- proc.time()
-  system(paste0("meirlop --jobs 10 --fa ", path, "/others/scored.fasta ", path,
+  system(paste0(". /home/pigerm/.bashrc; meirlop --jobs 10 --fa ", path, "/others/scored.fasta ", path,
                 "/others/motifs.jaspar ", path, "/raw/meirlop.out"))
   e <- read.delim(paste0(path, "/raw/meirlop.out/lr_results.tsv"), header=TRUE, row.names=1)
   row.names(e) <- gsub(" .*","",row.names(e))

@@ -1,7 +1,7 @@
 # First flavor of monaLisa: MOtif aNAlysis with Lisa
 
 runmonaLisa <- function(DAR, motifs, peaks, genome, nBins=11, minAbsLfc=0.3,
-                        background = c("otherBins","zeroBin")){
+                        background = c("otherBins","zeroBin"), minMatchScore=10){
   
   # At first a normalization should be done
   
@@ -42,7 +42,7 @@ runmonaLisa <- function(DAR, motifs, peaks, genome, nBins=11, minAbsLfc=0.3,
   
   se <- calcBinnedMotifEnrR(seqs = DARseqs, 
                             bins = bins, 
-                            pwmL = motifs, 
+                            pwmL = motifs, min.score=minMatchScore,
                             BPPARAM = BiocParallel::MulticoreParam(8),
                             background = match.arg(background))
   

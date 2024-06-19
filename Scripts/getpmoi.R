@@ -74,9 +74,9 @@ fixMotifs <- function(motifs, spec, srcFolder="../../Scripts/"){
 #' @examples
 getpmoi <- function(genome,
                     peaks,
-                    spec=c("Hsapiens","Mmusculus"),
-                    seqStyle=c("ensembl","UCSC"),
-                    srcFolder, motifs=NULL){
+                    spec=c("Hsapiens","Mmusculus"), minHits=50L,
+                    seqStyle=c("ensembl","UCSC"), keepTop=NULL,
+                    srcFolder, motifs=NULL, thresh=NULL){
   seqStyle <- match.arg(seqStyle)
   
   if(is.character(peaks)){
@@ -95,9 +95,15 @@ getpmoi <- function(genome,
   }
   
   # Obtain the positions of motif instances which are later required as input for runATAC
+  if(is.null(thresh)) thresh <- 1e-4
   pmoi <- runFimo(peak_seqs, 
-                  motifs, 
+                  motifs, thresh=thresh,
                   meme_path="/common/meme/bin/", 
                   skip_matched_sequence=TRUE)
+  pmoi <- pmoi[order(mcols(pmoi)$motif_id, -mcols(pmoi)$score)]
+  pmoi <- split(pmoi, pmoi$motif_id)
+  if(!is.null(minHits)) pmoi <- pmoi[which(lengths(pmoi)>=minHits)]
+  if(!is.null(keepTop)) pmoi <- lapply(split(pmoi, pmoi$motif_id), n=keepTop, FUN=head)
+  pmoi <- sort(unlist(GRangesList(pmoi)))
   return(pmoi)
 }

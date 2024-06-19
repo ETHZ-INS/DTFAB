@@ -1,0 +1,28 @@
+---
+title: "Benchmark results using stringent motif matching"
+author: "Pierre-Luc Germain"
+date: "10/10/2023"
+output: html_document
+---
+
+```{r}
+source("../Scripts/compileBenchmark.R")
+source("../Scripts/runMethods.R")
+source("../Scripts/plot.R")
+interactors <- readRDS("../Scripts/allInteractors.rds")
+archs <- list(h=readRDS("../misc/mergedMotifs.human.rds"),
+              m=readRDS("../misc/mergedMotifs.mouse.rds"))
+```
+
+```{r}
+datasets <- getDatasets()
+res <- compileBenchmark(datasets, interactors=interactors, archetypes = archs)
+res <- renameMethods(res)
+saveRDS(res, "results.rds")
+```
+
+```{r}
+res <- readRDS("results.rds")
+rankHeatmap2(res)
+```
+
