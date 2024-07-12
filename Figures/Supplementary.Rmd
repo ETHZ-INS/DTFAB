@@ -174,7 +174,7 @@ plot_grid(plot_grid(p1,p2,nrow=1,labels="AUTO",scale=0.95),
 **A: Reproducibility of chromVAR-based differential accessibility ananylsis.**
 Each color represents a dataset. The line and shaded area respectively represent 
 the mean and standard error of the pairwise correlations across 7 independent 
-runs of the chromVAR>limma pipeline for each dataset and setting, of the ranks 
+runs of the chromVAR(z-score)>limma pipeline for each dataset and setting, of the ranks 
 of the (union of) top 20 motifs.
 **B: Illustration of the motif-specific position weights for the insertionModel method.**
 **C: Illustration of the computation of the network score.** 
@@ -246,73 +246,7 @@ p2 <- ggplot(cv1, aes(`chromVAR(deviations)>limma`, `chromVAR(z)>Qt>limma`, labe
         labs(x="Rank of true motif in chromVAR(deviations)>limma",
              y="Rank of true motif in\nchromVAR(z)>Qt>limma") +
         ggtitle("Differential analysis on normalized z-scores\nis preferable to using the adjusted deviations")
-
-resFoN <- readRDS("../fullOnNucFreePeaks/results.rds")
-resFoN <- renameMethods(resFoN)
-resNF <- readRDS("../nucFree/results.rds")
-resNF <- renameMethods(resNF)
-resNFoF <- readRDS("../NFonFull/results.rds")
-resNFoF <- renameMethods(resNFoF)
-m <- merge(resFoN, resNF, by=c("dataset", "method"), suffix=c(".FoNF",".NF"))
-m2 <- merge(res, resNFoF, by=c("dataset","method"), suffix=c("",".NFoF"))
-m <- merge(m, m2, by=c("dataset","method"))
-m <- m[m$method %in% c("chromVAR(z)>limma","monaLisa.vsOthers"),]
-m$diffsign <- diff2Type(-sign(m$rank.FoNF-m$rank))
-p3 <- ggplot(m, aes(rank, rank.FoNF, label=dataset, colour=diffsign)) + 
-    geom_abline(slope=1, colour="grey") + geom_point() + 
-    ggrepel::geom_text_repel(min.segment.length=0, size=3, alpha=0.7, show.legend=FALSE) + 
-  facet_wrap(~method) + scale_x_log10() + scale_y_log10() + aTheme + 
-    scale_colour_manual(values=typecols) +
-    labs(x="Rank of true motif (using all fragments)",
-         y="Rank of true motif\n(all frags on NF peaks)",
-         colour="Change (in y relative to x):",
-         title="Specifically using nucleosome-free fragments does not generally improve results")
-m$diffsign <- diff2Type(-sign(m$rank.NF-m$rank))
-p4 <- ggplot(m, aes(rank, rank.NF, label=dataset, colour=diffsign)) + 
-    geom_abline(slope=1, colour="grey") + geom_point() + 
-    ggrepel::geom_text_repel(min.segment.length=0, size=3, alpha=0.7) + 
-  facet_wrap(~method) + scale_x_log10() + scale_y_log10() + aTheme +
-    scale_colour_manual(values=typecols) +
-    labs(x="Rank of true motif (using all fragments)", y="Rank of true motif\n(only NF frags on NF peaks)")
-m$diffsign <- diff2Type(-sign(m$rank.NFoF-m$rank))
-p5 <- ggplot(m, aes(rank, rank.NFoF, label=dataset, colour=diffsign)) + 
-    geom_abline(slope=1, colour="grey") + geom_point() + 
-    ggrepel::geom_text_repel(min.segment.length=0, size=3, alpha=0.7) + 
-  facet_wrap(~method) + scale_x_log10() + scale_y_log10() + aTheme +
-    scale_colour_manual(values=typecols) +
-    labs(x="Rank of true motif (using all fragments)", y="Rank of true motif\n(only NF fragments)")
 ```
-
-
-```{r, fig.width=8, fig.height=8}
-plot_grid(
-  plot_grid(p1,p2, nrow=1, scale=0.95, labels="AUTO"),
-  get_legend(p3 + theme(legend.position = "bottom") + 
-               guides(colour=guide_legend(override.aes=list(size=3)))),
-  p3, p4, p5, nrow=5, scale=c(1,1,0.95,0.95,0.95), labels=c(NA,NA,"C","D","E"),
-  rel_heights=c(1.1,0.15,1.1,1,1)
-)
-```
-
-**`r getFigNb()`: Impact of modifications on top workflows.** 
-**A:** Comparison of the true motif ranks obtained by a *limma* analysis 
-on the chromVAR deviations, versus using chromVAR's native 
-*differentialDeviations*.
-**B:** Comparison of the true motif ranks obtained by a *limma* analysis on the 
-normalized chromVAR z-scores, versus on the chromVAR deviations.
-**C:** Comparison of the true motif ranks obtained by the top method of each 
-family of approaches, when using peaks called from nucleosome-free fragments 
-(but counting all fragments overlapping them).
-**D:** Comparison of the true motif ranks obtained by the top method of each 
-family of approaches, when using only nucleosome-free fragments. In each case, 
-the TFs in blue indicate an improvement, those in red a worsening, and those in 
-black no change.
-
-\newpage
-
-
-
-# `r getFigNb(TRUE)`
 
 ```{r}
 dev1 <- readRDS("/mnt/bohacek/externData/2022_Caradonna_GSE200670_stress_ATAC/motifs_deviations.rds")
@@ -334,22 +268,28 @@ row.names(d2) <- NULL
 d2$sample <- factor(d2$sample)
 d$sample <- factor(d$sample)
 saveRDS(list(d=d, d2=d2), "../misc/example_distribution_shifts.rds")
+
+p3a <- ggplot(d, aes(z, group=sample, colour=condition)) + 
+  geom_vline(xintercept=0) + 
+  geom_density(show.legend = FALSE, linewidth=1) + facet_wrap(~type, nrow=2) + 
+  theme_bw() + coord_cartesian(xlim=c(-20,20))
+# p3b <- ggplot(d2, aes(deviations, group=sample, colour=condition)) + 
+#   geom_vline(xintercept=0) + 
+#   geom_density(show.legend = FALSE, linewidth=1) + facet_wrap(~type, nrow=1) + 
+#   theme_bw() + coord_cartesian(xlim=c(-0.05,0.05))
+# p3 <- plot_grid(p3a,p3b,nrow=1,rel_widths = c(2,1), labels=c("A","B"), scale=0.95)
 ```
 
 
 ```{r, fig.width=8, fig.height=8}
-p1 <- ggplot(d, aes(z, group=sample, colour=condition)) + 
-  geom_vline(xintercept=0) + 
-  geom_density(show.legend = FALSE, linewidth=1) + facet_wrap(~type, nrow=1) + 
-  theme_bw() + coord_cartesian(xlim=c(-20,20))
-p2 <- ggplot(d2, aes(deviations, group=sample, colour=condition)) + 
-  geom_vline(xintercept=0) + 
-  geom_density(show.legend = FALSE, linewidth=1) + facet_wrap(~type, nrow=1) + 
-  theme_bw() + coord_cartesian(xlim=c(-0.05,0.05))
-p0 <- plot_grid(p1,p2,nrow=1,rel_widths = c(2,1), labels=c("A","B"), scale=0.95)
+res <- readRDS("../fullFrags/results.rds")
+res <- res[grep("chromVAR",res$method),]
+h1 <- rankHeatmap2(res, rowann = NA, cellLabelFontsize=6, colann=NA, doDraw=FALSE,
+                   row_names_gp=gpar(fontsize=9), column_names_gp=gpar(fontsize=10))
 
 fl <- system("ls ../fullFrags/*/runATAC_results/with_pvalues/CV*", intern = TRUE)
-fl <- fl[grep("CVqt|CVnorm|CVcentered|CVdev\\.rds|CV\\.rds",fl)]
+fl <- fl[grep("CVqt|CVnorm|CVcentered|CVdev|CV\\.rds",fl)]
+fl <- fl[grep("trend|ihw",fl,invert = TRUE)]
 fl <- fl[grep("_1h",fl,invert=TRUE)]
 ds <- basename(dirname(dirname(dirname(fl))))
 d <- data.frame(Dataset=ds, method=gsub("\\.rds","",basename(fl)))
@@ -360,65 +300,64 @@ d$t <- sapply(seq_along(cv2), FUN=function(i){
   truth <- datasets[[ds[[i]]]]$truth
   x[head(which(row.names(x) %in% truth),1),"t"]
 })
-d$direction <- ifelse(sapply(datasets, FUN=function(x) x$type)[d$Dataset]=="ligand",1,-1)
-d$t <- d$t*d$direction
+d$rank <- sapply(seq_along(cv2), FUN=function(i){
+  x <- cv2[[i]]
+  truth <- datasets[[ds[[i]]]]$truth
+  x[head(which(row.names(x) %in% truth),1),"rank"]
+})
+direction <- ifelse(sapply(datasets, FUN=function(x) x$type)[d$Dataset]=="ligand",1,-1)
+d$t <- d$t*direction
 d$t[d$t<0] <- 0
+d <- renameMethods(d)
+
 d2 <- reshape2::dcast(d, Dataset~method, value.var="t")
-p1 <- ggplot(d2, aes(CV, CVqt, label=Dataset, colour=factor(sign(CVqt-CV)))) + 
-        geom_abline(slope=1, colour="grey") + geom_point() + 
-        ggrepel::geom_text_repel(min.segment.length = 0) + 
-        scale_x_sqrt() + scale_y_sqrt() + theme_bw() + 
-        scale_colour_manual(values=c("-1"="red", "0"="black", "1"="darkblue")) +
-        theme(legend.position ="none", title=element_text(size=10)) +
-        labs(x="t-value in chromVAR(z)>limma",
-             y="t-value in chromVAR(z)>QtNorm>limma")
-p2 <- ggplot(d2, aes(CV, CVcentered, label=Dataset, colour=factor(sign(CVcentered-CV)))) + 
-        geom_abline(slope=1, colour="grey") + geom_point() + 
-        ggrepel::geom_text_repel(min.segment.length = 0) + 
-        scale_x_sqrt() + scale_y_sqrt() + theme_bw() + 
-        scale_colour_manual(values=c("-1"="red", "0"="black", "1"="darkblue")) +
-        theme(legend.position ="none", title=element_text(size=10)) +
-        labs(x="t-value in chromVAR(z)>limma",
-             y="t-value in chromVAR(z)>centered>limma")
-p3 <- ggplot(d2, aes(CV, CVnorm, label=Dataset, colour=factor(sign(CVnorm-CV)))) + 
-    geom_abline(slope=1, colour="grey") + geom_point() + 
-    ggrepel::geom_text_repel(min.segment.length = 0) + 
-    scale_x_sqrt() + scale_y_sqrt() + theme_bw() + 
-    scale_colour_manual(values=c("-1"="red", "0"="black", "1"="darkblue")) +
-    theme(legend.position ="none", title=element_text(size=10)) +
-    labs(x="t-value in chromVAR(z)>limma",
-         y="t-value in chromVAR(z)>scale>limma")
-
-p4 <- ggplot(d2, aes(CVdev, CVqt, label=Dataset, colour=factor(sign(CVqt-CVdev)))) + 
-    geom_abline(slope=1, colour="grey") + geom_point() + 
-    ggrepel::geom_text_repel(min.segment.length = 0) + 
-    scale_x_sqrt() + scale_y_sqrt() + theme_bw() + 
-    scale_colour_manual(values=c("-1"="red", "0"="black", "1"="darkblue")) +
-    theme(legend.position ="none", title=element_text(size=10)) +
-    labs(x="t-value in chromVAR(deviations)>limma",
-         y="t-value in chromVAR(z)>QtNorm>limma")
-
-plot_grid(p0, plot_grid(p1, p2, nrow=1, labels=LETTERS[3:4], scale=0.9),
-          plot_grid(p3, p4, nrow=1, labels=LETTERS[5:6], scale=0.9),
-          nrow=3, rel_heights=c(3,4,4))
+row.names(d2) <- d2[,1]
+tvals <- t(d2[,-1])
+t2 <- t((t(tvals)-colMeans(tvals))/colMeans(1+tvals))
+cf <- function(j, i, x, y, width, height, fill){
+  grid.text(sprintf("%1.0f", tvals[i, j]), x, y,
+                      gp=gpar(fontsize=6))
+}
+h2 <- Heatmap(t2, cell_fun = cf, cluster_rows = FALSE, cluster_columns = FALSE, row_names_side="left",
+              column_title="t-values", column_order = names(h1@column_order),
+              row_order = order(-rowMeans(t2)), name="Relative\ndeviation\nto dataset\naverage",
+              row_names_gp=gpar(fontsize=9), column_names_gp=gpar(fontsize=10))
 ```
 
-**`r getFigNb()` : Differences in the chromVAR motif score distributions across samples, and impact of their normalization** 
-**A-B:** Example of a subset of ATAC samples from 
+
+```{r, fig.width=8, fig.height=7.8}
+plot_grid(plot_grid(p1, p2, nrow=1, labels=LETTERS[1:2], scale=0.9),
+          plot_grid(p3a, 
+                    plot_grid(grid.grabExpr(draw(h1)), grid.grabExpr(draw(h2)), nrow=2, rel_heights = c(12,11), labels=c("D","E")),
+                    scale=0.95, labels=c("C",NA), nrow=1, rel_widths=c(1.5,3)),
+          nrow=2, rel_heights=c(1.3,3))
+```
+
+**`r getFigNb()`: Impact of modifications to the chromVAR-limma workflow.** 
+**A:** Comparison of the true motif ranks obtained by a *limma* analysis 
+on the chromVAR deviations, versus using chromVAR's native 
+*differentialDeviations*.
+**B:** Comparison of the true motif ranks obtained by a *limma* analysis on the 
+normalized chromVAR z-scores, versus on the chromVAR deviations. In **A-B**, 
+datasets in blue indicate an improvement over the x-axis. Axes are 
+squareroot-transformed for ease of visualization.
+**C:** Example of a subset of ATAC samples from 
 <a href="https://doi.org/10.1016/j.ynstr.2022.100475">Caradonna, Paul and Marrocco (2022)</a> 
 (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE200670">GSE200670</a>),
-where different samples show different shapes of motif z-scores distributions.
+where different samples show different shapes of z-scores distributions across motif.
 When peaks are not resized to all have the same width, as recommended, the 
-distributions are often globally shifted (**A**, left). Even when peaks are 
-resized (**A**, right), differences in the width of the z-scores distributions 
+distributions are often globally shifted (**C**, top). Even when peaks are 
+resized (**C**, bottom), differences in the width of the z-scores distributions 
 which are not related to experimental groups can persist in some datasets. This 
 is not specific to the z-scores, but also present in the bias-corrected 
-deviations (**B**).
-**C-F:** For each comparison, the limma's t-value for the true TF is reported; for datasets 
-involving a downregulation of the TF, the sign of the t-value was inverted. For 
-ease of visualization, t-values below 0 were set to zero, and the axes were 
-square-root transformed. TF in blue show an improvement, while those in red show
-a worsening, and those in black are unchanged.
+deviations.
+**D-E:** Effect on the rank of the true TF (**D**) and its *t*-value (**E**) of 
+normalizing the chromVAR activity scores (i.e. z-scores or deviations) 
+distributions across samples before running limma. In **E**, for datasets where 
+a downregulation was expected, the *t*-values were inverted. The heatmap colors
+show the method's deviation relative to the dataset average, while the numbers
+indicate the actual (rounded) *t*-value.
+
 
 
 \newpage
@@ -426,6 +365,7 @@ a worsening, and those in black are unchanged.
 
 
 # `r getFigNb(TRUE)`
+
 
 ```{r}
 dev <- readRDS("../singleCell/dev.SE.rds")
@@ -480,11 +420,10 @@ but sometimes detrimental, and quantile normalization also tends to be beneficia
 (Wilcoxon p~`r format(wilcox.test(d$difference[d$assay=="quantile"], alternative="greater")$p.value, digits=2)`).
 
 
-
 \newpage
 
-
 # `r getFigNb(TRUE)`
+
 
 ```{r, fig.width=8, fig.height=9}
 res1 <- readRDS("../fullFrags/results.rds")
@@ -492,7 +431,8 @@ res2 <- readRDS("../GCnorm/results.rds")
 res2$method <- paste0("GC>",res2$method)
 res1$norm <- "TMM"
 res2$norm <- "GCsmoothQuantile"
-res <- rbind(res1,res2)
+res <- rbind(res1[,colnames(res2)],res2)
+res$method <- gsub("GCsmooth","GC",res$method)
 
 h1 <- rankHeatmap2(res, doDraw=FALSE, column_title="Rank of true TF",
                    row_names_gp=gpar(fontsize=8.5), cellLabelFontsize=7)
@@ -506,7 +446,141 @@ plot_grid(h, scale=0.95)
 **`r getFigNb()` : Rank-based metrics of all variants, including smooth quantile normalization in GC bins.**
 
 
+
 \newpage
+
+# `r getFigNb(TRUE)`
+
+```{r, fig.width=7.5, fig.height=8}
+res1 <- readRDS("../fullFrags/results.rds")
+res1$match <- "default"
+res1 <- res1[!grepl("scale|center|deviations\\)>Qt>|fewer|smaller|spearman",res1$method),]
+res2 <- readRDS("../stringentMatch/results.rds")
+res2$match <- "stringent"
+im <- intersect(unique(res1$method),unique(res2$method))
+res1 <- res1[res1$method %in% im,colnames(res2)]
+res2 <- res2[res2$method %in% im,]
+co <- getOrder(res1, "transRank", columns = TRUE)
+h <- rankHeatmap2(res1, rowann=NA, row_order=rev(getOrder(res1, "transRank")), column_order = co,
+                   row_names_gp=gpar(fontsize=10), row_names_max_width=unit(8,"cm"), doDraw = FALSE, row_title="Default matching") %v%
+rankHeatmap2(res2, rowann=NA, row_order=rev(getOrder(res2, "transRank")), column_order = co, 
+                   row_names_gp=gpar(fontsize=10), row_names_max_width=unit(8,"cm"), doDraw = FALSE, row_title="Stringent matching")
+
+res <- rbind(filterMethods(res1), filterMethods(res2))
+res$method <- paste0(ifelse(res$match=="default","","stringent-"),res$method)
+res$type <- res$match
+p <- sensFDRplot(res, hull = FALSE)
+
+plot_grid(grid.grabExpr(draw(h), wrap.grobs = TRUE), p,
+          nrow=2, rel_heights=c(2,1.1), labels=LETTERS[1:2], scale=c(0.9,0.95))
+```
+
+
+**`r getFigNb()` : Impact of stringency in motif matching.** 
+Rank of the true TF (**A**) and Precision-Recall (**B**) of selected methods,
+when using a stringent motif matching vs the default.
+
+
+\newpage
+
+# `r getFigNb(TRUE)`
+
+```{r, fig.width=7, fig.height=8}
+res1 <- readRDS("../fullFrags/results.rds")
+res1 <- res1[!grepl("scale|center|deviations\\)>Qt>|fewer|smaller|spearman|decouple|-lm|VIPER|ulm|BaGFoot",res1$method),]
+res1$motifs <- "default"
+res2 <- readRDS("../withArchetypes/results.rds")
+res2$motifs <- "archetypes"
+im <- intersect(unique(res1$method),unique(res2$method))
+res1 <- res1[res1$method %in% im,colnames(res2)]
+res2 <- res2[res2$method %in% im,]
+co <- getOrder(res1, "transRank", columns = TRUE)
+h <- rankHeatmap2(res1, rowann=NA, row_order=rev(getOrder(res1, "transRank")), cap=12, column_order = co,
+                   row_names_gp=gpar(fontsize=10), row_names_max_width=unit(8,"cm"), doDraw = FALSE, row_title="All motifs") %v%
+rankHeatmap2(res2, rowann=NA, row_order=rev(getOrder(res2, "transRank")), cap=12, column_order = co, 
+                   row_names_gp=gpar(fontsize=10), row_names_max_width=unit(8,"cm"), doDraw = FALSE, row_title="Using archetypes")
+
+res <- rbind(filterMethods(res1), filterMethods(res2))
+res$method <- paste0(ifelse(res$motifs=="archetypes","arch-",""),res$method)
+res$type <- res$motifs
+p <- sensFDRplot(res, hull = FALSE)
+
+plot_grid(grid.grabExpr(draw(h), wrap.grobs = TRUE), p, scale=0.95,
+          nrow=2, rel_heights=c(2,1.1), labels=LETTERS[1:2])
+```
+
+
+**`r getFigNb()` : Impact of using motif archetypes.** 
+Rank of the true TF (**A**) and Precision-Recall (**B**) of selected methods,
+when using motifs archetypes instead of the full collection of motifs. Given the
+difference in the size of the two sets of motifs, ranks were capped at 144 for 
+the purpose of creating the heatmap.
+
+
+\newpage
+
+# `r getFigNb(TRUE)`
+
+```{r, fig.width=8, fig.height=8}
+res <- readRDS("../fullFrags/results.rds")
+resFoN <- readRDS("../fullOnNucFreePeaks/results.rds")
+resFoN <- renameMethods(resFoN)
+resNF <- readRDS("../nucFree/results.rds")
+resNF <- renameMethods(resNF)
+resNFoF <- readRDS("../NFonFull/results.rds")
+resNFoF <- renameMethods(resNFoF)
+m <- merge(resFoN, resNF, by=c("dataset", "method"), suffix=c(".FoNF",".NF"))
+m2 <- merge(res, resNFoF, by=c("dataset","method"), suffix=c("",".NFoF"))
+m <- merge(m, m2, by=c("dataset","method"))
+m <- m[m$method %in% c("chromVAR(z)>limma","monaLisa.vsOthers"),]
+m$diffsign <- diff2Type(-sign(m$rank.FoNF-m$rank))
+p3 <- ggplot(m, aes(rank, rank.FoNF, label=dataset, colour=diffsign)) + 
+    geom_abline(slope=1, colour="grey") + geom_point() + 
+    ggrepel::geom_text_repel(min.segment.length=0, size=3, alpha=0.7, show.legend=FALSE) + 
+  facet_wrap(~method) + scale_x_log10() + scale_y_log10() + aTheme + 
+    scale_colour_manual(values=typecols) +
+    labs(x="Rank of true motif (using all fragments)",
+         y="Rank of true motif\n(all frags on NF peaks)",
+         colour="Change (in y relative to x):",
+         title="Specifically using nucleosome-free fragments does not generally improve results")
+m$diffsign <- diff2Type(-sign(m$rank.NF-m$rank))
+p4 <- ggplot(m, aes(rank, rank.NF, label=dataset, colour=diffsign)) + 
+    geom_abline(slope=1, colour="grey") + geom_point() + 
+    ggrepel::geom_text_repel(min.segment.length=0, size=3, alpha=0.7) + 
+  facet_wrap(~method) + scale_x_log10() + scale_y_log10() + aTheme +
+    scale_colour_manual(values=typecols) +
+    labs(x="Rank of true motif (using all fragments)", y="Rank of true motif\n(only NF frags on NF peaks)")
+m$diffsign <- diff2Type(-sign(m$rank.NFoF-m$rank))
+p5 <- ggplot(m, aes(rank, rank.NFoF, label=dataset, colour=diffsign)) + 
+    geom_abline(slope=1, colour="grey") + geom_point() + 
+    ggrepel::geom_text_repel(min.segment.length=0, size=3, alpha=0.7) + 
+  facet_wrap(~method) + scale_x_log10() + scale_y_log10() + aTheme +
+    scale_colour_manual(values=typecols) +
+    labs(x="Rank of true motif (using all fragments)", y="Rank of true motif\n(only NF fragments)")
+```
+
+
+```{r, fig.width=8, fig.height=7.5}
+plot_grid(
+  p3, p4, p5, nrow=3, scale=c(1,1,0.95,0.95,0.95), labels=LETTERS[1:3],
+  rel_heights=c(1.1,1,1)
+)
+```
+
+**`r getFigNb()`: Impact of using nucelosome-free fragments.** 
+**A:** Comparison of the true motif ranks obtained by the top method of each 
+family of approaches, when using peaks called from nucleosome-free fragments 
+(but counting all fragments overlapping them).
+**B:** Comparison of the true motif ranks obtained by the top method of each 
+family of approaches, when using only nucleosome-free fragments.
+**C:** Comparison of the true motif ranks obtained by the top method of each 
+family of approaches, when counting only nucleosome-free fragments overlapping
+peaks called on all fragments. In each case, the TFs in blue indicate an 
+improvement, those in red a worsening, and those in black no change.
+
+\newpage
+
+
 
 # `r getFigNb(TRUE)`
 
@@ -544,7 +618,7 @@ lower or equal to the observed one.
 
 \newpage
 
-```{r, child="../simulations/sfig_sim.Rmd"}
+```{r, child="../simulations/sfig_sim.Rmd", eval=FALSE}
 ```
 
 
@@ -563,12 +637,12 @@ pd <- ggplot(dag, aes(condition, value)) +
   stat_summary(data=densities, fun.data = "mean_se", geom = "errorbar", width=0.3, linewidth=1) + 
   theme_bw() + coord_cartesian(ylim=c(0,1)) +
   labs(y="p50/NFkB1 density ratio to GAPDH,\nas a proportion to DMSO")
-  
+
 plot_grid( ggdraw() + draw_image("traftac_WB.png") + coord_cartesian(expand=0),
            pd, nrow=2, labels="AUTO", rel_heights=c(2,3), scale=0.95)
 ```
 
 
 **`r getFigNb()` : Western blot confirms the downregulation of p50/NfKB.**
-Western blot (**A**) and corresponding densitometry showing a downregulation of 
+Western blot (**A**) and corresponding densitometry (**B**) showing a downregulation of 
 p50/NFkB in HEK cells treated with NFkB TRAFTACs versus scrambled TRAFTACs.

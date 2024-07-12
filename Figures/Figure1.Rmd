@@ -17,21 +17,11 @@ res <- readRDS("../fullFrags/results.rds")
 res <- res[which(!(res$method %in% c("Ridge-lm", # redundant with lasso
                                      "GCsmooth>fastMLM>limma"))),] # show in a later step
 # remove non-basic chromvar/monalisa variants
-res <- res[!grepl("scale|center|deviations\\)>Qt>|fewer|smaller|spearman",res$method),]
-res$relAUC[is.na(res$relAUC)] <- ifelse(is.na(res$rank[which(is.na(res$relAUC))]), NA, 0)
-res$archRelAUC[is.na(res$archRelAUC)] <- ifelse(is.na(res$rank[which(is.na(res$archRelAUC))]), NA, 0)
+res <- res[!grepl("scale|center|deviations\\)>Qt>|fewer|smaller|spearman|permutation",res$method),]
 ```
 
 ```{r, fig.width=10, fig.height=10}
-ro <- rev(getOrder(res))
-co <- getOrder(res, columns=TRUE)
-h1 <- rankHeatmap2(res, doDraw=FALSE, column_title="Rank of true TF", row_names_gp=gpar(fontsize=10), row_order=ro, column_order = co)
-h2 <- suppressWarnings(relAUCplot2(res, row_order=ro, doDraw=FALSE,
-                  column_title="Network score", column_order=co))
-h3 <- suppressWarnings(relAUCplot2(res, row_order=ro, doDraw=FALSE, name="Archetype\nscore",
-                                   column_title="Archetype score", val="archRelAUC",
-                                   col="archRelAUC", column_order=co, hmcolors=viridisLite::inferno(100)))
-h <- grid.grabExpr(draw(h1 + h2 + h3, merge=TRUE))
+h <- grid.grabExpr(draw(resHeatmap(res, cellLabelFontsize=7), merge=TRUE))
 
 res2 <- filterMethods(res, rename=FALSE)
 res2$method <- gsub(":","",res2$method)
