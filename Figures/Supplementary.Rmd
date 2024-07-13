@@ -155,7 +155,12 @@ p3 <- ggplot(d, aes(x=rank, y=propCoFact, ymax=propCoFact, fill=Method, colour=M
        title="Network score")
 
 
-res <- readRDS("../fullFrags/results.rds")
+res2 <- res <- readRDS("../fullFrags/results.rds")
+# res2$rank[res2$rank>100] <- 100
+# median(sapply(split(res2,res2$dataset), FUN=function(x){
+#     cor(x$rank, x$relAUC, use="pairwise")
+# }), na.rm=TRUE)
+# cor(res2$rank, res2$relAUC, use="pairwise")
 res2 <- filterMethods(res)
 p4 <- ggplot(res, aes(rank, relAUC, shape=dataset, color=method)) + 
   geom_point(show.legend = FALSE) + scale_x_log10() + theme_bw() +
@@ -188,65 +193,14 @@ Each point represents the results of a method (colour) in a dataset (shape).
 The network score is not entirely comparable across datasets. 
 Beside this effect, and except at very low (1-3) or high (>100) ranks (i.e. 
 where the ranks stop being discriminatory), there is a good agreement between
-the two metrics.
+the two metrics. Capping ranks to 100, the overall correlation between between 
+ranks and network score is -0.61, and the median correlation across datasets is -0.76.
 
 
 \newpage
 
 
 # `r getFigNb(TRUE)`
-
-```{r}
-source("../Scripts/plot.R")
-source("../Scripts/runMethods.R")
-res <- readRDS("../fullFrags/results.rds")
-res <- renameMethods(res)
-
-aTheme <- theme_bw() + theme(legend.position ="none", title=element_text(size=10),
-                             plot.title=element_text(size=10.5))
-
-diff2Type <- function(x){
-  factor(sign(x), c("-1","0","1"), c("worsened","same","improved"))
-}
-
-
-CVlimma <- res[which(res$method %in% c("chromVAR(deviations)>limma","chromVAR:differentialDeviations")),]
-cv1 <- reshape2::dcast(CVlimma, formula = dataset~method, value.var = "rank")
-cv1$diffsign <- diff2Type(cv1$`chromVAR:differentialDeviations`-cv1$`chromVAR(deviations)>limma`)
-typecols <- setNames(c("red","black","darkblue"),levels(cv1$diffsign))
-
-# p1 <- ggplot(ranks, aes(TMM, GCsmoothQuantile, label=dataset, colour=type)) +
-#   geom_abline(slope=1, colour="grey", linetype="dashed") + geom_point() + 
-#   ggrepel::geom_text_repel(min.segment.length=0, size=2.5, alpha=0.6) + 
-#   scale_colour_manual(values=typecols) +
-#   facet_wrap(~method) + scale_y_log10() + scale_x_log10() + theme_bw() +
-#   theme(legend.position = "bottom") + 
-#   labs(x="Rank of true motif, using standard (TMM) normalization",
-#        y="Rank of true motif, using smooth quantile normalization",
-#        colour="Change in using smooth quantile normalization:") +
-#   guides(colour=guide_legend(override.aes=list(size=3)))
-
-p1 <- ggplot(cv1, aes(`chromVAR:differentialDeviations`, `chromVAR(deviations)>limma`, label=dataset, colour=diffsign)) + 
-        geom_abline(slope=1, colour="grey") + geom_point() + 
-        ggrepel::geom_text_repel(min.segment.length=0, size=3, alpha=0.7) + 
-        scale_x_log10() + scale_y_log10() + aTheme +
-        scale_colour_manual(values=typecols) +
-        labs(x="Rank of true motif in chromVAR::differentialDeviations",
-             y="Rank of true motif in\nchromVAR(deviations)>limma") +
-        ggtitle("chromVAR>limma outperforms native\nchromVAR differential analysis")
-
-CVlimma <- res[which(res$method %in% c("chromVAR(deviations)>limma","chromVAR(z)>Qt>limma")),]
-cv1 <- reshape2::dcast(CVlimma, formula = dataset~method, value.var = "rank")
-cv1$diffsign <- diff2Type(cv1$`chromVAR(deviations)>limma`-cv1$`chromVAR(z)>Qt>limma`)
-p2 <- ggplot(cv1, aes(`chromVAR(deviations)>limma`, `chromVAR(z)>Qt>limma`, label=dataset, colour=diffsign)) + 
-        geom_abline(slope=1, colour="grey") + geom_point() + 
-        ggrepel::geom_text_repel(min.segment.length=0, size=3, alpha=0.7) + 
-        scale_x_log10() + scale_y_log10() + aTheme +
-        scale_colour_manual(values=typecols) +
-        labs(x="Rank of true motif in chromVAR(deviations)>limma",
-             y="Rank of true motif in\nchromVAR(z)>Qt>limma") +
-        ggtitle("Differential analysis on normalized z-scores\nis preferable to using the adjusted deviations")
-```
 
 ```{r}
 dev1 <- readRDS("/mnt/bohacek/externData/2022_Caradonna_GSE200670_stress_ATAC/motifs_deviations.rds")
@@ -271,21 +225,100 @@ saveRDS(list(d=d, d2=d2), "../misc/example_distribution_shifts.rds")
 
 p3a <- ggplot(d, aes(z, group=sample, colour=condition)) + 
   geom_vline(xintercept=0) + 
-  geom_density(show.legend = FALSE, linewidth=1) + facet_wrap(~type, nrow=2) + 
+  geom_density(show.legend = FALSE, linewidth=1) + facet_wrap(~type, nrow=1) + 
   theme_bw() + coord_cartesian(xlim=c(-20,20))
-# p3b <- ggplot(d2, aes(deviations, group=sample, colour=condition)) + 
-#   geom_vline(xintercept=0) + 
-#   geom_density(show.legend = FALSE, linewidth=1) + facet_wrap(~type, nrow=1) + 
-#   theme_bw() + coord_cartesian(xlim=c(-0.05,0.05))
-# p3 <- plot_grid(p3a,p3b,nrow=1,rel_widths = c(2,1), labels=c("A","B"), scale=0.95)
+p3b <- ggplot(d2, aes(deviations, group=sample, colour=condition)) +
+  geom_vline(xintercept=0) +
+  geom_density(show.legend = FALSE, linewidth=1) + facet_wrap(~type, nrow=1) +
+  theme_bw() + coord_cartesian(xlim=c(-0.05,0.05))
+p3 <- plot_grid(p3a,p3b,nrow=1,rel_widths = c(2,1), labels=c("A","B"), scale=0.95)
 ```
+
+
+```{r}
+a <- readRDS("../misc/TMM_res.rds")
+dev1 <- readRDS("../fullFrags/NR1H4/runATAC_results/raw/CV_raw.rds")$obj1
+dev2 <- SummarizedExperiment(list(z=a$NR1H4$z))
+dev1$condition <- dev2$condition <- rep(c("CTRL","KD"),each=3)
+d <- dplyr::bind_rows(list(
+  "Standard"=sechm::meltSE(dev1, row.names(dev1), assayName="z"),
+  "TMM"=sechm::meltSE(dev2, row.names(dev2), assayName="z")
+  ), .id="type")
+d$Dataset <- "NR1H4"
+dev1 <- readRDS("../fullFrags/BANP/runATAC_results/raw/CV_raw.rds")$obj1
+dev2 <- SummarizedExperiment(list(z=a$BANP$z))
+dev1$condition <- dev2$condition <- rep(c("CTRL","KD"),each=2)
+d2 <- dplyr::bind_rows(list(
+  "Standard"=sechm::meltSE(dev1, row.names(dev1), assayName="z"),
+  "TMM"=sechm::meltSE(dev2, row.names(dev2), assayName="z")
+  ), .id="type")
+d2$Dataset <- "BANP"
+d <- rbind(d,d2)
+zdist <- ggplot(d, aes(z, group=sample, colour=condition)) + 
+  geom_vline(xintercept=0) + 
+  geom_density(show.legend = FALSE, linewidth=1) + facet_grid(Dataset~type) + 
+  theme_bw() + coord_cartesian(xlim=c(-10,10))
+
+res1 <- readRDS("../fullFrags/results.rds")
+res1 <- res1[res1$method=="chromVAR(z)>limma",]
+ds <- getDatasets()
+res1$rank2 <- unlist(lapply(res1$dataset, FUN=function(x){
+  x <- head(which(row.names(a[[x]]$res) %in% ds[[x]]$truth),1)
+  if(length(x)==0) return(NA)
+  x
+}))
+res1$diffsign <- diff2Type(res1$rank-res1$rank2)
+typecols <- setNames(c("red","black","darkblue"),levels(res1$diffsign))
+res1 <- res1[!is.na(res1$rank2),]
+rp <- ggplot(res1, aes(rank, rank2, label=dataset, colour=diffsign)) + geom_abline(slope=1, col="grey") + 
+  geom_point() + scale_x_log10() + scale_y_log10() +
+  labs(x="Rank of true TF\nstandard normalization",
+       y="Rank of true TF\nTMM normalization") +
+  scale_colour_manual(values=typecols, guide="none") +
+  ggrepel::geom_text_repel(size=3)
+```
+
+
+```{r, fig.width=8, fig.height=6}
+plot_grid(p3,
+          plot_grid(zdist, rp, rel_widths=c(1.5,1), scale=0.95, labels=c("C","D")),
+          nrow=2, rel_heights=c(1,1.3))
+```
+
+
+**`r getFigNb()`: Differences in distributions of chromVAR z-scores across samples.** 
+**A-B:** Example of a subset of ATAC samples from 
+<a href="https://doi.org/10.1016/j.ynstr.2022.100475">Caradonna, Paul and Marrocco (2022)</a> 
+(<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE200670">GSE200670</a>),
+where different samples show different shapes of z-scores distributions across motif.
+The colors indicate different experimental conditions.
+When peaks are not resized to all have the same width, as recommended, the 
+distributions are often globally shifted (**A**, left). Even when peaks are 
+resized (**A**, right), differences in the width of the z-scores distributions 
+which are not related to experimental groups can persist in some datasets. This 
+is not specific to the z-scores, but also present in the bias-corrected 
+deviations (**B**).
+**C-D:** Effect on replacing the internal library size normalization performed
+by chromVAR with a TMM normalization. TMM normalization does not reduce the 
+differences in z-score distributions (**C**), nor does it improve the rank of
+the true TF (**D**).
+
+
+\newpage
+
+
+
+# `r getFigNb(TRUE)`
+
+
 
 
 ```{r, fig.width=8, fig.height=8}
 res <- readRDS("../fullFrags/results.rds")
 res <- res[grep("chromVAR",res$method),]
-h1 <- rankHeatmap2(res, rowann = NA, cellLabelFontsize=6, colann=NA, doDraw=FALSE,
-                   row_names_gp=gpar(fontsize=9), column_names_gp=gpar(fontsize=10))
+h1 <- rankHeatmap2(res, rowann = NA, cellLabelFontsize=7, colann=NA, doDraw=FALSE,
+                   row_names_gp=gpar(fontsize=9), column_names_gp=gpar(fontsize=10),
+                   column_title=NA)
 
 fl <- system("ls ../fullFrags/*/runATAC_results/with_pvalues/CV*", intern = TRUE)
 fl <- fl[grep("CVqt|CVnorm|CVcentered|CVdev|CV\\.rds",fl)]
@@ -319,53 +352,10 @@ cf <- function(j, i, x, y, width, height, fill){
                       gp=gpar(fontsize=6))
 }
 h2 <- Heatmap(t2, cell_fun = cf, cluster_rows = FALSE, cluster_columns = FALSE, row_names_side="left",
-              column_title="t-values", column_order = names(h1@column_order),
-              row_order = order(-rowMeans(t2)), name="Relative\ndeviation\nto dataset\naverage",
+              column_title=NA, column_order = names(h1@column_order),
+              row_order = order(-rowMeans(t2)), name="Relative t\ndeviation\nto dataset\naverage",
               row_names_gp=gpar(fontsize=9), column_names_gp=gpar(fontsize=10))
 ```
-
-
-```{r, fig.width=8, fig.height=7.8}
-plot_grid(plot_grid(p1, p2, nrow=1, labels=LETTERS[1:2], scale=0.9),
-          plot_grid(p3a, 
-                    plot_grid(grid.grabExpr(draw(h1)), grid.grabExpr(draw(h2)), nrow=2, rel_heights = c(12,11), labels=c("D","E")),
-                    scale=0.95, labels=c("C",NA), nrow=1, rel_widths=c(1.5,3)),
-          nrow=2, rel_heights=c(1.3,3))
-```
-
-**`r getFigNb()`: Impact of modifications to the chromVAR-limma workflow.** 
-**A:** Comparison of the true motif ranks obtained by a *limma* analysis 
-on the chromVAR deviations, versus using chromVAR's native 
-*differentialDeviations*.
-**B:** Comparison of the true motif ranks obtained by a *limma* analysis on the 
-normalized chromVAR z-scores, versus on the chromVAR deviations. In **A-B**, 
-datasets in blue indicate an improvement over the x-axis. Axes are 
-squareroot-transformed for ease of visualization.
-**C:** Example of a subset of ATAC samples from 
-<a href="https://doi.org/10.1016/j.ynstr.2022.100475">Caradonna, Paul and Marrocco (2022)</a> 
-(<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE200670">GSE200670</a>),
-where different samples show different shapes of z-scores distributions across motif.
-When peaks are not resized to all have the same width, as recommended, the 
-distributions are often globally shifted (**C**, top). Even when peaks are 
-resized (**C**, bottom), differences in the width of the z-scores distributions 
-which are not related to experimental groups can persist in some datasets. This 
-is not specific to the z-scores, but also present in the bias-corrected 
-deviations.
-**D-E:** Effect on the rank of the true TF (**D**) and its *t*-value (**E**) of 
-normalizing the chromVAR activity scores (i.e. z-scores or deviations) 
-distributions across samples before running limma. In **E**, for datasets where 
-a downregulation was expected, the *t*-values were inverted. The heatmap colors
-show the method's deviation relative to the dataset average, while the numbers
-indicate the actual (rounded) *t*-value.
-
-
-
-\newpage
-
-
-
-# `r getFigNb(TRUE)`
-
 
 ```{r}
 dev <- readRDS("../singleCell/dev.SE.rds")
@@ -398,10 +388,10 @@ d$difference <- d$smd-d$baseline
 ```
 
 
-```{r, fig.width=8, fig.height=7}
+```{r, fig.width=8, fig.height=4}
 d$transformation <- d$assay
 levels(d$transformation)[1] <- "none"
-ggplot(d, aes(transformation, smd, group=sample, colour=TF)) + 
+p <- ggplot(d, aes(transformation, smd, group=sample, colour=TF)) + 
     geom_hline(data=d[d$transformation=="z",],aes(yintercept=smd), linetype="dashed", colour="grey") +
     geom_point(size=2) + geom_line(linewidth=1) + theme_bw() + 
     labs(y="Standardized mean difference") + 
@@ -409,10 +399,23 @@ ggplot(d, aes(transformation, smd, group=sample, colour=TF)) +
     theme(legend.position="none", axis.text.x=element_text(angle=45, hjust=1, vjust=1))
 ```
 
-**`r getFigNb()` : Impact of chromVAR motif z-score normalization at the single-cell level.** 
-As a proxy to signal-to-noise ratio, we computed the standardized mean 
-difference of the respective motif for each guide RNA (individual lines) to the 
-mean of the control guide RNAs. Centering is always beneficial (Wilcoxon 
+
+```{r, fig.width=7.5, fig.height=8}
+plot_grid(grid.grabExpr(draw(h1)), grid.grabExpr(draw(h2)), p, nrow=3, rel_heights = c(11,10,16),
+          labels=LETTERS[1:3], scale=0.95)
+```
+
+**`r getFigNb()`: Impact of normalization of the chromVAR z-score distributions.** 
+**A-B:** Effect on the rank of the true TF (**A**) and its *t*-value (**B**) of 
+normalizing the chromVAR activity scores (i.e. z-scores or deviations) 
+distributions across samples before running limma. In **B**, for datasets where 
+a downregulation was expected, the *t*-values were inverted. The heatmap colors
+show the method's deviation relative to the dataset average, while the numbers
+indicate the actual (rounded) *t*-value.
+**C:** Impact on the single-cell z-scores. As a proxy to signal-to-noise ratio, 
+we computed the standardized mean difference of the respective motif for each 
+guide RNA (individual lines) to the mean of the control guide RNAs. Centering 
+is always beneficial (Wilcoxon 
 p<`r format(wilcox.test(d$difference[d$assay=="centered"], alternative="greater")$p.value, digits=1)`),
 unit-variance scaling is often beneficial (Wilcoxon 
 p~`r format(wilcox.test(d$difference[d$assay=="scaled"], alternative="greater")$p.value, digits=1)`) 
@@ -420,12 +423,13 @@ but sometimes detrimental, and quantile normalization also tends to be beneficia
 (Wilcoxon p~`r format(wilcox.test(d$difference[d$assay=="quantile"], alternative="greater")$p.value, digits=2)`).
 
 
+
 \newpage
 
 # `r getFigNb(TRUE)`
 
 
-```{r, fig.width=8, fig.height=9}
+```{r, fig.width=8, fig.height=9.5}
 res1 <- readRDS("../fullFrags/results.rds")
 res2 <- readRDS("../GCnorm/results.rds")
 res2$method <- paste0("GC>",res2$method)
@@ -568,12 +572,12 @@ plot_grid(
 ```
 
 **`r getFigNb()`: Impact of using nucelosome-free fragments.** 
-**A:** Comparison of the true motif ranks obtained by the top method of each 
+**A:** Comparison of the rank of the true motif obtained by the top method of each 
 family of approaches, when using peaks called from nucleosome-free fragments 
 (but counting all fragments overlapping them).
-**B:** Comparison of the true motif ranks obtained by the top method of each 
+**B:** Comparison of the rank of the true motif obtained by the top method of each 
 family of approaches, when using only nucleosome-free fragments.
-**C:** Comparison of the true motif ranks obtained by the top method of each 
+**C:** Comparison of the rank of the true true motif obtained by the top method of each 
 family of approaches, when counting only nucleosome-free fragments overlapping
 peaks called on all fragments. In each case, the TFs in blue indicate an 
 improvement, those in red a worsening, and those in black no change.

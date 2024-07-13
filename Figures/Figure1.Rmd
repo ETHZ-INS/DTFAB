@@ -18,32 +18,13 @@ res <- res[which(!(res$method %in% c("Ridge-lm", # redundant with lasso
                                      "GCsmooth>fastMLM>limma"))),] # show in a later step
 # remove non-basic chromvar/monalisa variants
 res <- res[!grepl("scale|center|deviations\\)>Qt>|fewer|smaller|spearman|permutation",res$method),]
+
+h <- resHeatmap(res, cellLabelFontsize=7)
 ```
 
-```{r, fig.width=10, fig.height=10}
-h <- grid.grabExpr(draw(resHeatmap(res, cellLabelFontsize=7), merge=TRUE))
-
-res2 <- filterMethods(res, rename=FALSE)
-res2$method <- gsub(":","",res2$method)
-rtplot <- runtimePlot2(res2) + 
-  scale_x_continuous(breaks=c(5,60,180,360,600,1200),
-                     minor_breaks=c(1,30,120,270,480,900,1500)) +
-  coord_trans(x="sqrt", xlim=c(1,1400)) + theme(legend.position=c(0.75,0.2))
-pr <- sensFDRplot(res2, useArch = TRUE) + 
-  ggtitle("Top variant per method, at nominal p.adjust <= 0.5") +
-  theme(plot.title=element_text(size=11),
-        axis.title=element_text(size=10))
-fig <- cowplot::plot_grid(
-  h,
-  plot_grid(pr, rtplot, labels=LETTERS[2:3], nrow=1, scale=0.95, rel_widths=c(4,3.5)),
-  nrow=2, labels=c("A",NA), scale=c(0.95,1), rel_heights = c(7,3)
-)
-fig
-```
-
-```{r}
-pdf("Figure1.pdf", width=10, height=10)
-fig
+```{r, fig.width=10, fig.height=7}
+pdf("Figure1.pdf", width=10, height=7)
+draw(h, merge=TRUE)
 dev.off()
 ```
 
