@@ -267,6 +267,9 @@ res1$rank2 <- unlist(lapply(res1$dataset, FUN=function(x){
   if(length(x)==0) return(NA)
   x
 }))
+diff2Type <- function(x){
+  factor(sign(x), c("-1","0","1"), c("worsened","same","improved"))
+}
 res1$diffsign <- diff2Type(res1$rank-res1$rank2)
 typecols <- setNames(c("red","black","darkblue"),levels(res1$diffsign))
 res1 <- res1[!is.na(res1$rank2),]

@@ -45,7 +45,6 @@ diff2Type <- function(x){
   factor(sign(x), c("-1","0","1"), c("worsened","same","improved"))
 }
 
-
 CVlimma <- res[which(res$method %in% c("chromVAR(deviations)>limma","chromVAR:differentialDeviations")),]
 cv1 <- reshape2::dcast(CVlimma, formula = dataset~method, value.var = "rank")
 cv1$diffsign <- diff2Type(cv1$`chromVAR:differentialDeviations`-cv1$`chromVAR(deviations)>limma`)
