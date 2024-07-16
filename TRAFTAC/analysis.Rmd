@@ -301,35 +301,71 @@ saveRDS(mse,"gcnorm.mlm.SE.rds")
 sechm(mse, head(row.names(res),20), do.scale = TRUE, left_annotation="meanAbsT")
 ```
 
+## insertion model
+
+```{r}
+bams <- list.files("/mnt/germain/datasets/2023_nfkbTraftac_ATAC/aligned", pattern="bam$", full=TRUE)
+motifs <- getNonRedundantMotifs(species="Hsapiens")
+moi <- motifmatchr::matchMotifs(motifs, subject=readRDS("peakCounts.SE.rds"), genome=genome, out="positions")
+moi <- unlist(GRangesList(lapply(names(moi), FUN=function(x){ y <- moi[[x]]; y$motif_id <- x; y })))
+moi$motif_id <- factor(moi$motif_id)
+moi <- keepSeqlevels(moi,seqlevelsInUse(moi),pruning.mode = "coarse")
+source("../Scripts/runBaGFoot.R")
+se.mba <- getModelBasedActivity(bams, moi, paired=TRUE, BPPARAM=MulticoreParam(4, progress=TRUE))
+dds <- calcNormFactors(DGEList(assay(se.mba)))
+groups <- rep(LETTERS[1:2],each=2)
+design <- model.matrix(~groups)
+fit <- eBayes(lmFit(voom(dds, design), design))
+topTFs <- as.data.frame(topTable(fit, number = Inf))
+rowData(se.mba)$DA <- topTFs[row.names(se.mba),]
+saveRDS(se.mba, "insertionModel.SE.rds")
+```
 
 
 ## Checking the insertion profile of some candidates
 
-```{r, fig.width=8.5, fig.height=6}
-motifs <- getNonRedundantMotifs(species="Hsapiens")[c("NFKB1",uMo)]
+```{r, fig.width=7, fig.height=4}
+motifs <- getNonRedundantMotifs(species="Hsapiens")[c("NFKB1")]
 moi <- motifmatchr::matchMotifs(motifs, subject=se, genome=genome, out="positions")
-tracks <- list.files("/mnt/plger/datasets/2023_nfkbTraftac_ATAC/tracks/", full=TRUE)
-names(mos) <- mos <- c("FOS", "NFKB1", "BACH2", "NFE2", "BHE40", "NF2L2")
-d <- dplyr::bind_rows(lapply(mos, FUN=function(x){
-  epiwraps::meltSignals(epiwraps::signal2Matrix(tracks, regions=moi[[x]], extend=1000L, w=5L))
-}), .id="Motif")
-d$condition <- d$sample
-levels(d$condition) <- ifelse(grepl("Ctrl",levels(d$condition)), "CTRL", "NFKB-KD")
-ggplot(d, aes(position, mean, group=sample, colour=condition)) + geom_line(linewidth=0.75) + 
-  facet_wrap(~Motif, nrow=2, scales="free_y") +
-  theme_bw() + theme(legend.position = "none")
-d2 <- dplyr::bind_rows(lapply(split(d, paste(d$Motif,d$sample)), FUN=function(x){
-  x$sm.mean <- as.numeric(smooth(x$mean, twiceit = FALSE))
-  x
-}))
-ggplot(d2, aes(position, sm.mean, group=sample, colour=condition)) + geom_line(linewidth=0.75) + 
-  facet_wrap(~Motif, nrow=2, scales="free_y") +
-  theme_bw() + theme(legend.position = "bottom") + scale_x_continuous(expand=expansion()) +
-  labs(x="Position around motif", y="Normalized insertion sites density")
+moi <- moi[[1]]
+names(moi) <- as.character(granges(moi))
+moi <- keepSeqlevels(moi,seqlevelsInUse(moi),pruning.mode = "coarse")
+tracks <- list.files("/mnt/plger/datasets/2023_nfkbTraftac_ATAC/tracks2/", pattern="\\.bw", full=TRUE)
+sm <- signal2Matrix(tracks, regions=moi, extend=250L, w=1L)
+nf <- epiwraps::getNormFactors(tracks)
+sm <- epiwraps::renormalizeSignalMatrices(sm, scaleFactors=nf)
+d1 <- epiwraps::meltSignals(sm, trim = 0.99999)
 
+tracks <- list.files("/mnt/plger/datasets/2023_nfkbTraftac_ATAC/biasCorrected/", pattern="_corrected\\.bw", full=TRUE)
+sm <- signal2Matrix(tracks, regions=moi, extend=250L, w=1L)
+nf <- epiwraps::getNormFactors(tracks)
+sm <- epiwraps::renormalizeSignalMatrices(sm, scaleFactors=nf)
+d2 <- epiwraps::meltSignals(sm, trim = 0.99999)
+
+d1$type <- "uncorrected"
+d2$type <- "bias-corrected"
+levels(d2$sample) <- gsub("_corrected","",levels(d2$sample))
+
+d <- rbind(d1,d2)
+d$condition <- d$sample
+levels(d$condition) <- ifelse(grepl("Ctrl",levels(d$sample)), "CTRL", "NFKB-KD")
+d$type <- factor(d$type, unique(d$type))
+levels(d$type)[2] <- "bias-corrected (TOBIAS)"
+saveRDS(d, "Nfkb_profile.rds")
+ggplot(d, aes(position, mean, group=sample, colour=condition)) + geom_line(linewidth=0.75) + 
+  facet_wrap(~type, scales="free_y", nrow=2) + theme_bw() + xlim(-100,100) + 
+  labs(x="Position around motif center",
+       y="Normalized insertion sites")
 ```
 
 
+```{r}
+mo <- t(as.matrix(motifs[[1]])+1L)
+mo <- t(mo/rowSums(mo))
+genome <- BSgenome.Hsapiens.UCSC.hg38
+seqlevelsStyle(genome) <- "ensembl"
+ATACseqQC::factorFootprints("/mnt/plger/datasets/2023_nfkbTraftac_ATAC/aligned/Ctrl_PG_1.bam", pfm=mo, genome=genome)
+```
 
 
 

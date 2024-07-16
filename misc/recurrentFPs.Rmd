@@ -1,0 +1,33 @@
+---
+title: "Reccu"
+author: "Pierre-Luc Germain"
+date: "10/19/2023"
+output: html_document
+---
+
+```{r}
+source("../Scripts/runMethods.R")
+ds <- getDatasets()
+```
+
+```{r}
+fps <- lapply(setNames(names(ds),names(ds)), FUN=function(x){
+  cv <- readRDS(paste0("../fullFrags/",x,"/runATAC_results/with_pvalues/CV.rds"))
+  ml <- readRDS(paste0("../fullFrags/",x,"/runATAC_results/with_pvalues/ML.rds"))
+  fp <- setdiff(intersect(row.names(cv)[cv$padj<0.05],row.names(ml)[ml$padj<0.05]), ds[[x]]$truth)
+  fp2 <- intersect(head(row.names(cv),10), head(row.names(ml),10))
+  fp3 <- intersect(head(row.names(cv),20), head(row.names(ml),20))
+  list(FP=fp, top10=fp2, top20=fp3)
+})
+fps1 <- sort(table(unlist(lapply(fps,head,n=1))),decreasing=TRUE)
+top <- sort(table(unlist(lapply(fps,FUN=function(x) x$top10))),decreasing=TRUE)
+top20 <- sort(table(unlist(lapply(fps,tail,n=1))),decreasing=TRUE)
+
+
+ap1 <- t(sapply(setNames(names(ds),names(ds)), FUN=function(x){
+  cv <- readRDS(paste0("../fullFrags/",x,"/runATAC_results/with_pvalues/CV.rds"))
+  ml <- readRDS(paste0("../fullFrags/",x,"/runATAC_results/with_pvalues/ML.rds"))
+  c(head(grep("^JUN|^FOS",row.names(cv)),1),(head(grep("^JUN|^FOS",row.names(ml)),1)))
+}))
+```
+

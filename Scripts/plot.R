@@ -1,17 +1,5 @@
-rankHeatmap <- function(res, rankBreaks=c(1,6,20,50,100,200,400), squeeze=FALSE){
-  p <- ggplot(res, aes(reorder(dataset,-sqrt(rank)), reorder(method,-sqrt(rank)),
-                  fill=sqrt(rank), label=rank)) + geom_tile() +  geom_text() +
-    scale_fill_viridis_c(direction=-1, breaks=sqrt(rankBreaks),
-                         trans="sqrt", labels=c("top",rankBreaks[-1])) +
-    labs(fill="Rank of\ntrue TF", y="Methods", x="Datasets") + theme_minimal()
-  if(squeeze) p <- p +
-      theme(legend.position="bottom", legend.key.width = unit(1,"cm"),
-            axis.text.x=element_text(angle=45, hjust=1, vjust=1))
-  p
-}
-
-rankHeatmap2 <- function(res, rankBreaks=c(1,10,30,75,150,300,600), ..., 
-                         column_title="Datasets", doDraw=TRUE, rowann=NULL,
+rankHeatmap2 <- function(res, rankBreaks=c(1,10,30,75,150,300,600), ..., cap=NULL,
+                         column_title="Datasets", doDraw=TRUE, rowann=NULL, colann=NULL,
                          datasetInfo=data.frame(
                           type=sapply(getDatasets(), FUN=function(x) x$type)),
                          cellLabelFontsize=8, row_order=NULL, column_order=NULL){
@@ -20,27 +8,37 @@ rankHeatmap2 <- function(res, rankBreaks=c(1,10,30,75,150,300,600), ...,
   row.names(rankm) <- rankm[,1]
   rankm <- sqrt(as.matrix(rankm[,-1]))
   rankmImputed <- .getImputed(rankm)
+  if(!is.null(cap)) rankm[which(rankm>cap)] <- cap
   if(is.null(row_order)) 
     row_order <- row.names(rankm)[order(rowMeans(rankmImputed, na.rm=TRUE))]
   if(is.null(column_order))
     column_order <- names(sort(-colMeans(rankm, na.rm=TRUE)))
   ancols <- list(type=c(CRISPRi="darkorange3", dTag="black", ligand="darkslateblue"))
-  colan <- HeatmapAnnotation(df = datasetInfo[colnames(rankm),,drop=FALSE],
-                             col=ancols, show_annotation_name=FALSE)
+  if(is.null(colann)){
+    colann <- HeatmapAnnotation(df = datasetInfo[colnames(rankm),,drop=FALSE],
+                                col=ancols, show_annotation_name=FALSE)
+  }else if(all(is.na(colann))){
+    colann <- NULL
+  }
   bdist <- log10(rankBreaks[-1]-rankBreaks[-length(rankBreaks)])
   rann <- getMethodAnno(row.names(rankm))
-  if(is.null(rowann))
+  if(is.null(rowann)){
     rowann <- rowAnnotation(df=rann$df, col=rann$col,
                             show_legend=colnames(rann$df)=="family")
+  }else if(all(is.na(rowann))){
+    rowann <- NULL
+  }
   h <- ComplexHeatmap::Heatmap(rankm, cluster_rows=FALSE, cluster_columns=FALSE,
           cell_fun=function(j, i, x, y, width, height, fill) {
-            grid.text(sprintf("%1.0f", rankm[i, j]^2), x, y,
+            l <- sprintf("%1.0f", rankm[i, j]^2)
+            if(!is.null(cap) && rankm[i,j]==cap) l <- ""
+            grid.text(l, x, y,
                       gp = gpar(fontsize=ifelse(is.na(rankm[i, j]),6,
                                                 cellLabelFontsize)))
           },
      col=viridisLite::viridis(100, direction=-1), name="Rank of\ntrue TF", ...,
      column_title=column_title, row_order=row_order, column_order=column_order, 
-     left_annotation=rowann, row_names_side="left", top_annotation=colan,
+     left_annotation=rowann, row_names_side="left", top_annotation=colann,
      heatmap_legend_param=list(at=rev(sqrt(rankBreaks)),
                                labels=rev(c("top",rankBreaks[-1])),
                                break_dist=rev(bdist), legend_height=unit(3.5, "cm"),
@@ -123,10 +121,10 @@ relAUCplot <- function(res, squeeze=FALSE){
   rankmImputed
 }
 
-getOrder <- function(res, values=c("sqrtRank","relAUC","archRelAUC"),
+getOrder <- function(res, values=c("transRank","relAUC","archRelAUC"),
                      columns=FALSE){
-  x <- -sqrt(res$rank-1)
-  res$sqrtRank <- 2*exp(x)/(1+exp(x))
+  x <- -sqrt(res$rank)
+  res$transRank <- 2*sqrt(exp(x)/(1+exp(x)))
   y <- lapply(values, FUN=function(x){
     x <- as.data.frame(reshape2::dcast(res, method~dataset, value.var=x))
     row.names(x) <- x[,1]
@@ -134,10 +132,10 @@ getOrder <- function(res, values=c("sqrtRank","relAUC","archRelAUC"),
   })
   if(columns){
     y <- do.call(rbind, y)
-    return(colnames(y)[order(colMeans(y)+colMedians(y))])
+    return(colnames(y)[order(colMeans(y))])
   }
   y <- do.call(cbind, y)
-  row.names(y)[order(rowMeans(y) + rowMedians(y))]
+  row.names(y)[order(rowMeans(y))]
 }
 
 relAUCplot2 <- function(res, doDraw=TRUE, column_title="Datasets", name=NULL,
@@ -247,7 +245,7 @@ renameMethods <- function(x, renaming=NULL){
     CVdev="chromVAR(deviations)>limma", CVdevCentered="chromVAR(deviations)>center>limma",
     CVdevNorm="chromVAR(deviations)>scale>limma", CVdevqt="chromVAR(deviations)>Qt>limma",
     diffTF="diffTF(permutations)", diffTF_noPerm="diffTF(analytic)",
-    fastMLM="GCsmooth>fastMLM>limma", meirlop="MEIRLOP"
+    fastMLM="GC>fastMLM>limma", meirlop="MEIRLOP"
   )
   for(i in names(renaming)) x <- replace(x, x==i, renaming[[i]])
   x <- gsub("decoupleR","decoupleR(",x,fixed=TRUE)
@@ -317,4 +315,19 @@ getMethodAnno <- function(methods){
     ancols$GCsmoothQ <- ancols$LFCbased
   }
   list(df=df, col=ancols)
+}
+
+resHeatmap <- function(res, row_names_gp=gpar(fontsize=10), ...){
+  res$relAUC[is.na(res$relAUC)] <- ifelse(is.na(res$rank[which(is.na(res$relAUC))]), NA, 0)
+  res$archRelAUC[is.na(res$archRelAUC)] <- ifelse(is.na(res$rank[which(is.na(res$archRelAUC))]), NA, 0)
+  ro <- rev(getOrder(res))
+  co <- getOrder(res, columns=TRUE)
+  h1 <- rankHeatmap2(res, doDraw=FALSE, column_title="Rank of true TF", 
+                     row_names_gp=row_names_gp, row_order=ro, column_order = co, ...)
+  h2 <- suppressWarnings(relAUCplot2(res, row_order=ro, doDraw=FALSE,
+                                     column_title="Network score", column_order=co, ...))
+  h3 <- suppressWarnings(relAUCplot2(res, row_order=ro, doDraw=FALSE, name="Archetype\nscore",
+                                     column_title="Archetype score", val="archRelAUC", ...,
+                                     col="archRelAUC", column_order=co, hmcolors=viridisLite::inferno(100)))
+  h1 + h2 + h3
 }

@@ -26,7 +26,7 @@ cv <- cv[order(cv$P.Value),]
 cv2 <- cv[which(abs(cv$logFC)>3.8 & cv$adj.P.Val<0.2 & cv$absMaxDeviation>0.005),]
 p1 <- ggplot(cv, aes(absMaxDeviation, logFC, colour=-log10(adj.P.Val), label=TF)) +
   geom_point() + scale_color_viridis_c(option="rocket",direction=-1) + theme_bw() +
-  geom_point(data=cv[grep("NFKB",row.names(cv)),], size=5, shape=1, alpha=1, colour="darkred") +
+  geom_point(data=cv[grep("NFKB",row.names(cv)),], size=5, shape=1, alpha=1, colour="yellow") +
   ggrepel::geom_text_repel(data=cv2, min.segment.length=0, max.overlaps=30, show.legend=FALSE,
                            nudge_y=sign(cv2$logFC)+2*cv2$absMaxDeviation>0.025, size=3) +
   labs(x="Maximum absolute chromVAR deviation", y="Motif log2(foldchange) with TRAFTAC") +
@@ -46,6 +46,7 @@ cv$TF <- row.names(cv)
 w <- which( (-log10(cv$ml.p) + -log10(cv$P.Value))>4)
 p2 <- ggplot(cv, aes(-log10(P.Value), -log10(ml.p), colour=abs(logFC), label=TF)) + 
   geom_point() + scale_colour_viridis_c(option="rocket", direction=-1) + theme_bw() + 
+  geom_point(data=cv[grep("NFKB",row.names(cv)),], size=5, shape=1, alpha=1, colour="yellow") +
   ggrepel::geom_text_repel(data=cv[w,], size=3) + theme(legend.position = "bottom") +
   labs(x="chromVAR -log10(p-value)", y="monaLisa -log10(p-value)", colour="chromVAR abs(logFC)")
 ```
