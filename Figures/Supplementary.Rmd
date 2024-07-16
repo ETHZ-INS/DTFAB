@@ -75,10 +75,10 @@ The dashed line represents a 0.05 FDR threshold, and indicated are the number of
 ATAC peaks passing this threshold, as well as the proportion of peaks with an 
 uncorrected p-value lower than 0.05. 
 **B:** Enrichment for experimental binding sites of the factor (main TF after 
-which the datasets are named) in ATAC peaks containing the respective motifs, 
-versus all ATAC peaks. 
-**C:** Proportion of ChIPseq peaks (overlapping ATAC peaks) that contain the 
-respective motif.
+which the datasets are named) in ATAC peaks containing matches for the 
+respective motifs, versus all ATAC peaks. 
+**C:** Proportion of ChIPseq peaks (overlapping ATAC peaks) that contain matches
+for the respective motif.
 
 
 \newpage
@@ -118,7 +118,7 @@ m$Position <- as.integer(m$Position)
 p2 <- ggplot(m[m$Motif %in% c("FOXO1","SOX2", "CTCF"),], aes(Position, value, colour=Motif)) +
   geom_line(linewidth=0.9) + theme_bw() + 
   labs(x="Position around motif center", y="Weight",
-       title="Position weights based on insertion sites\naround the motif in the whole dataset") +
+       title="Position weights based on insertion sites\naround motif matches in the whole dataset") +
   theme(legend.position=c(0.84,0.78), panel.grid.major=element_blank(), title=element_text(size=10),
         panel.grid.minor=element_blank()) + coord_cartesian(expand=FALSE)
 ```
@@ -179,12 +179,12 @@ plot_grid(plot_grid(p1,p2,nrow=1,labels="AUTO",scale=0.95),
 **A: Reproducibility of chromVAR-based differential accessibility ananylsis.**
 Each color represents a dataset. The line and shaded area respectively represent 
 the mean and standard error of the pairwise correlations across 7 independent 
-runs of the chromVAR(z-score)>limma pipeline for each dataset and setting, of the ranks 
-of the (union of) top 20 motifs.
+runs of the chromVAR(z-score)>limma pipeline for each dataset and setting, of 
+the ranks of the (union of) top 20 motifs.
 **B: Illustration of the motif-specific position weights for the insertionModel method.**
 **C: Illustration of the computation of the network score.** 
-The motifs are ranked for each method, and for each k=1:100 the proportion of 
-top k motifs that are part of the known network of the true TF is computed. 
+The motifs/TFs are ranked for each method, and for each k=1:100 the proportion of 
+top k TFs that are part of the known network of the true TF is computed. 
 The area under the curve is then reported, relative to the AUC of the best 
 possible motif ordering for that factor (gray area). The example plotted here is
 from the GATA1 dataset. 
@@ -278,7 +278,7 @@ rp <- ggplot(res1, aes(rank, rank2, label=dataset, colour=diffsign)) + geom_abli
   labs(x="Rank of true TF\nstandard normalization",
        y="Rank of true TF\nTMM normalization") +
   scale_colour_manual(values=typecols, guide="none") +
-  ggrepel::geom_text_repel(size=3)
+  ggrepel::geom_text_repel(size=3) + theme_bw()
 ```
 
 
@@ -293,7 +293,7 @@ plot_grid(p3,
 **A-B:** Example of a subset of ATAC samples from 
 <a href="https://doi.org/10.1016/j.ynstr.2022.100475">Caradonna, Paul and Marrocco (2022)</a> 
 (<a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE200670">GSE200670</a>),
-where different samples show different shapes of z-scores distributions across motif.
+where different samples show different shapes of z-scores distributions across motifs/TFs.
 The colors indicate different experimental conditions.
 When peaks are not resized to all have the same width, as recommended, the 
 distributions are often globally shifted (**A**, left). Even when peaks are 
@@ -451,6 +451,7 @@ plot_grid(h, scale=0.95)
 ```
 
 **`r getFigNb()` : Rank-based metrics of all variants, including smooth quantile normalization in GC bins.**
+Same as Figure 1, but showing all method variants tested.
 
 
 
@@ -518,7 +519,7 @@ plot_grid(grid.grabExpr(draw(h), wrap.grobs = TRUE), p, scale=0.95,
 
 
 **`r getFigNb()` : Impact of using motif archetypes.** 
-Rank of the true TF (**A**) and Precision-Recall (**B**) of selected methods,
+Rank of the true motif/archetype (**A**) and Precision-Recall (**B**) of selected methods,
 when using motifs archetypes instead of the full collection of motifs. Given the
 difference in the size of the two sets of motifs, ranks were capped at 144 for 
 the purpose of creating the heatmap.
@@ -528,62 +529,45 @@ the purpose of creating the heatmap.
 
 # `r getFigNb(TRUE)`
 
-```{r, fig.width=8, fig.height=8}
+```{r, fig.width=8, fig.height=7}
 res <- readRDS("../fullFrags/results.rds")
 resFoN <- readRDS("../fullOnNucFreePeaks/results.rds")
 resFoN <- renameMethods(resFoN)
+resFoN$type <- "All frags on NF peaks"
 resNF <- readRDS("../nucFree/results.rds")
 resNF <- renameMethods(resNF)
+resNF$type <- "NF frags on NF peaks"
 resNFoF <- readRDS("../NFonFull/results.rds")
 resNFoF <- renameMethods(resNFoF)
-m <- merge(resFoN, resNF, by=c("dataset", "method"), suffix=c(".FoNF",".NF"))
-m2 <- merge(res, resNFoF, by=c("dataset","method"), suffix=c("",".NFoF"))
-m <- merge(m, m2, by=c("dataset","method"))
+resNFoF$type <- "NF frags on full peaks"
+m <- rbind(resFoN, resNF, resNFoF)
+m <- merge(res[,c("dataset","method","rank")], m, by=c("dataset","method"))
 m <- m[m$method %in% c("chromVAR(z)>limma","monaLisa.vsOthers"),]
-m$diffsign <- diff2Type(-sign(m$rank.FoNF-m$rank))
-p3 <- ggplot(m, aes(rank, rank.FoNF, label=dataset, colour=diffsign)) + 
+m$diffsign <- diff2Type(-sign(m$rank.y-m$rank.x))
+
+ggplot(m, aes(rank.x, rank.y, label=dataset, colour=diffsign)) + 
     geom_abline(slope=1, colour="grey") + geom_point() + 
     ggrepel::geom_text_repel(min.segment.length=0, size=3, alpha=0.7, show.legend=FALSE) + 
-  facet_wrap(~method) + scale_x_log10() + scale_y_log10() + aTheme + 
+    facet_grid(type~method) + scale_x_log10() + scale_y_log10() + 
+    theme_bw() + theme(legend.position="bottom", title=element_text(size=10),
+                       plot.title=element_text(size=10.5)) +
     scale_colour_manual(values=typecols) +
-    labs(x="Rank of true motif (using all fragments)",
-         y="Rank of true motif\n(all frags on NF peaks)",
+    labs(x="Rank of true motif (standard: using all fragments on peaks called on all fragments)",
+         y="Rank of true motif (alternative)",
          colour="Change (in y relative to x):",
          title="Specifically using nucleosome-free fragments does not generally improve results")
-m$diffsign <- diff2Type(-sign(m$rank.NF-m$rank))
-p4 <- ggplot(m, aes(rank, rank.NF, label=dataset, colour=diffsign)) + 
-    geom_abline(slope=1, colour="grey") + geom_point() + 
-    ggrepel::geom_text_repel(min.segment.length=0, size=3, alpha=0.7) + 
-  facet_wrap(~method) + scale_x_log10() + scale_y_log10() + aTheme +
-    scale_colour_manual(values=typecols) +
-    labs(x="Rank of true motif (using all fragments)", y="Rank of true motif\n(only NF frags on NF peaks)")
-m$diffsign <- diff2Type(-sign(m$rank.NFoF-m$rank))
-p5 <- ggplot(m, aes(rank, rank.NFoF, label=dataset, colour=diffsign)) + 
-    geom_abline(slope=1, colour="grey") + geom_point() + 
-    ggrepel::geom_text_repel(min.segment.length=0, size=3, alpha=0.7) + 
-  facet_wrap(~method) + scale_x_log10() + scale_y_log10() + aTheme +
-    scale_colour_manual(values=typecols) +
-    labs(x="Rank of true motif (using all fragments)", y="Rank of true motif\n(only NF fragments)")
 ```
 
-
-```{r, fig.width=8, fig.height=7.5}
-plot_grid(
-  p3, p4, p5, nrow=3, scale=c(1,1,0.95,0.95,0.95), labels=LETTERS[1:3],
-  rel_heights=c(1.1,1,1)
-)
-```
 
 **`r getFigNb()`: Impact of using nucelosome-free fragments.** 
-**A:** Comparison of the rank of the true motif obtained by the top method of each 
-family of approaches, when using peaks called from nucleosome-free fragments 
-(but counting all fragments overlapping them).
-**B:** Comparison of the rank of the true motif obtained by the top method of each 
-family of approaches, when using only nucleosome-free fragments.
-**C:** Comparison of the rank of the true true motif obtained by the top method of each 
-family of approaches, when counting only nucleosome-free fragments overlapping
-peaks called on all fragments. In each case, the TFs in blue indicate an 
-improvement, those in red a worsening, and those in black no change.
+Comparison of the rank of the true motif obtained by the top method of each 
+family of approaches, when using alternative peaks or overlap counts based on
+nucleosome-free fragments. 'All frags on NF peaks' stands for counting overlaps
+with fragments of any size, but on peaks called on nucleosome-free (NF) fragments
+only. 'NF frags on NF peaks' stands for using only NF-fragments, i.e. counting 
+overlaps of NF fragments on peaks called only on NF fragments. Finally, 
+'NF frags on full peaks' stands for counting overlaps of only NF fragments, but
+on the standard peaks (called using all fragments).
 
 \newpage
 

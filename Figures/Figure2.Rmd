@@ -26,9 +26,9 @@ res2$method <- gsub(":","",res2$method)
 rtplot <- runtimePlot2(res2) + 
   scale_x_continuous(breaks=c(5,60,180,360,600,1200),
                      minor_breaks=c(1,30,120,270,480,900,1500)) +
-  coord_trans(x="sqrt", xlim=c(1,1400)) + theme(legend.position="bottom")
+  coord_trans(x="sqrt", xlim=c(1,1400)) + theme(legend.position="top")
 pr <- sensFDRplot(res2, useArch = TRUE) + 
-  ggtitle("Top variant per method, at nominal p.adjust <= 0.5") +
+  ggtitle("Top variant per method,\nat nominal adjusted p-value <= 0.5") +
   theme(plot.title=element_text(size=11),
         axis.title=element_text(size=10))
 ```

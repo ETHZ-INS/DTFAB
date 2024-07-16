@@ -75,8 +75,8 @@ sensFDRplot <- function(res, fade=NULL, PR=TRUE, hull=TRUE, label.size=3.5, long
     p <- ggplot(res2, aes(Sensitivity, precision, label=method, colour=type, alpha=fade))
     if(longTitles){
       yl <- ifelse(useArch,
-                   "Precision (i.e. 1-FDR)\n(Proportion in network archetypes)",
-                   "Precision (i.e. 1-FDR)\n(Proportion of network motifs among significant)"
+                   "Precision\n(Proportion in network archetypes)",
+                   "Precision\n(Proportion of network motifs among significant)"
                    )
       p <- p +
       labs(x="Recall (i.e. sensitivity)\n(Proportion of datasets in which the true motif is significant)",
@@ -84,7 +84,7 @@ sensFDRplot <- function(res, fade=NULL, PR=TRUE, hull=TRUE, label.size=3.5, long
     }else{
       p <- p +
         labs(x="Recall (i.e. sensitivity)",
-             y="Precision (i.e. 1-FDR)")
+             y="Precision")
     }
   }else{
     p <- ggplot(res2, aes(FDR, Sensitivity, label=method, colour=type, alpha=fade))
