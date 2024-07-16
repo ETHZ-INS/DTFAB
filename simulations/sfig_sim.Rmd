@@ -473,7 +473,7 @@ res[,method:=tstrsplit(folder, keep=7, split="/")]
 res[,method:=tstrsplit(method, keep=1, split=".", fixed=TRUE)]
 
 # get baseline peformances (es==0)
-baseLineFile <- list.files("./data/data_baseline", recursive=TRUE, full.names=TRUE)
+baseLineFile <- list.files("./data/data_baseline", pattern="rds$", recursive=TRUE, full.names=TRUE)
 baseLineFile <- baseLineFile[grepl("with_pvalues", baseLineFile)]
 resBase <- lapply(baseLineFile, readRDS)
 resBase <- lapply(resBase, as.data.table, keep.rownames=TRUE)
@@ -522,7 +522,7 @@ resPos[,method:=tstrsplit(folder, keep=7, split="/")]
 resPos[,method:=tstrsplit(method, keep=1, split=".", fixed=TRUE)]
 
 # get effect strength 0 files
-baseLineFile <- list.files("./data/data_baseline", recursive=TRUE, full.names=TRUE)
+baseLineFile <- list.files("./data/data_baseline", pattern="rds$", recursive=TRUE, full.names=TRUE)
 baseLineFile <- baseLineFile[grepl("with_pvalues", baseLineFile)]
 resBase <- lapply(baseLineFile, readRDS)
 resBase <- lapply(resBase, as.data.table, keep.rownames=TRUE)
