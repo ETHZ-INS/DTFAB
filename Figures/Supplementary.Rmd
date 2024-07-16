@@ -168,7 +168,7 @@ p4 <- ggplot(res, aes(rank, relAUC, shape=dataset, color=method)) +
 
 ```
 
-```{r, fig.width=8, fig.height=8}
+```{r, fig.width=8, fig.height=7.5}
 plot_grid(plot_grid(p1,p2,nrow=1,labels="AUTO",scale=0.95),
           plot_grid(p3,p4,nrow=1,labels=LETTERS[3:4],scale=0.95),
           nrow=2, rel_heights = c(4.5,5))
@@ -609,7 +609,7 @@ lower or equal to the observed one.
 
 \newpage
 
-```{r, child="../simulations/sfig_sim.Rmd", eval=FALSE}
+```{r, child="../simulations/sfig_sim.Rmd", eval=TRUE}
 ```
 
 
