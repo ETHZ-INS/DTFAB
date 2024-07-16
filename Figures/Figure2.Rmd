@@ -28,7 +28,7 @@ rtplot <- runtimePlot2(res2) +
                      minor_breaks=c(1,30,120,270,480,900,1500)) +
   coord_trans(x="sqrt", xlim=c(1,1400)) + theme(legend.position="top")
 pr <- sensFDRplot(res2, useArch = TRUE) + 
-  ggtitle("Top variant per method,\nat nominal adjusted p-value <= 0.5") +
+  ggtitle("Top variant per method,\nat nominal adjusted p-value <= 0.05") +
   theme(plot.title=element_text(size=11),
         axis.title=element_text(size=10))
 ```
