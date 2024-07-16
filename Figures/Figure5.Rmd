@@ -118,7 +118,6 @@ pp <- plot_grid(
   p3b,
   nrow=2, rel_heights=c(5.2,4), labels=c(NA,"C")
 )
-pp
 pdf("Figure5.pdf", height=7.5, width=8.5)
 pp
 dev.off()
