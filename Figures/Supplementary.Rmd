@@ -194,7 +194,7 @@ The network score is not entirely comparable across datasets.
 Beside this effect, and except at very low (1-3) or high (>100) ranks (i.e. 
 where the ranks stop being discriminatory), there is a good agreement between
 the two metrics. Capping ranks to 100, the overall correlation between between 
-ranks and network score is -0.61, and the median correlation across datasets is -0.76.
+ranks and network score is -0.61, and the median correlation across datasets is -0.72.
 
 
 \newpage
