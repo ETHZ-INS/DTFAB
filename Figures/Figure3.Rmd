@@ -57,7 +57,7 @@ p2 <- grid.grabExpr(rankHeatmap2(res3, rowann=rowann, column_title="",
                                  column_names_gp=gpar(fontsize=10)))
 res3$type <- res3$norm!="TMM"
 p3 <- sensFDRplot(res3, longTitles=FALSE, hull=FALSE) +
-  ggtitle("at nominal adjusted p-value <= 0.5") +
+  ggtitle("at nominal adjusted p-value <= 0.05") +
   theme(plot.title=element_text(size=11), 
         axis.title=element_text(size=10))
 ```
