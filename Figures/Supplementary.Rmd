@@ -156,11 +156,11 @@ p3 <- ggplot(d, aes(x=rank, y=propCoFact, ymax=propCoFact, fill=Method, colour=M
 
 
 res2 <- res <- readRDS("../fullFrags/results.rds")
-# res2$rank[res2$rank>100] <- 100
-# median(sapply(split(res2,res2$dataset), FUN=function(x){
-#     cor(x$rank, x$relAUC, use="pairwise")
-# }), na.rm=TRUE)
-# cor(res2$rank, res2$relAUC, use="pairwise")
+res2$rank[res2$rank>100] <- 100
+cc1 <- round(median(sapply(split(res2,res2$dataset), FUN=function(x){
+    cor(x$rank, x$relAUC, use="pairwise")
+}), na.rm=TRUE), 2)
+cc2 <- round(cor(res2$rank, res2$relAUC, use="pairwise"),2)
 res2 <- filterMethods(res)
 p4 <- ggplot(res, aes(rank, relAUC, shape=dataset, color=method)) + 
   geom_point(show.legend = FALSE) + scale_x_log10() + theme_bw() +
@@ -194,7 +194,7 @@ The network score is not entirely comparable across datasets.
 Beside this effect, and except at very low (1-3) or high (>100) ranks (i.e. 
 where the ranks stop being discriminatory), there is a good agreement between
 the two metrics. Capping ranks to 100, the overall correlation between between 
-ranks and network score is -0.61, and the median correlation across datasets is -0.72.
+ranks and network score is `r cc2`, and the median correlation across datasets is `r cc1`.
 
 
 \newpage
