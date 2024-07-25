@@ -139,6 +139,9 @@ getBenchmarkMetrics <- function(dataset, path=head(dataset$truth,1),
 }
 
 .getBenchmarkMetrics <- function(x, truth, interactors){
+  if(is.na(x$p[1]))
+    return(data.frame(rank=NA_integer_, trueQ=NA, FDR=NA_real_,
+                      AUC=NA_real_, relAUC=NA_real_))
   if(is.list(interactors)){
     cofactors <- unique(c(truth, unlist(interactors[truth])))
   }else{
