@@ -86,7 +86,12 @@ getBenchmarkMetrics <- function(dataset, path=head(dataset$truth,1),
   names(fl) <- gsub("\\.rds$","",basename(fl))
   res <- lapply(fl, readRDS)
   res <- res[sapply(res, FUN=function(x) isTRUE(nrow(x)>1))]
-  
+  allTFs <- row.names(res[["CV"]]) # unfiltered results
+  if(!is.null(allTFs) && !all(sapply(interactors[dataset$truth], is.null))){
+    interactors[dataset$truth] <- lapply(interactors[dataset$truth], y=allTFs,
+                                         FUN=intersect)
+  }
+
   res <- lapply(res, FUN=function(x){
     if(archetypeLevel){
       stopifnot(!is.null(archetypes))
@@ -147,8 +152,6 @@ getBenchmarkMetrics <- function(dataset, path=head(dataset$truth,1),
   }else{
     cofactors <- union(truth, interactors)
   }
-  allTFs <- row.names(x)
-  cofactors <- intersect(cofactors, allTFs)
   cappedNCof <- min(length(cofactors),100)
   optimalAUC <- sum(cumsum(c(rep(1,cappedNCof),
                              rep(0,100-cappedNCof)))/seq_len(100))
