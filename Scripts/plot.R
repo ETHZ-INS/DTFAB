@@ -55,6 +55,7 @@ sensFDRplot <- function(res, fade=NULL, PR=TRUE, hull=TRUE, label.size=3.5, long
   if(is.null(res$type)){
     res$type <- ifelse(grepl("GSEA|ulm|msViper|decoupleR|MonaLisa|diffTF|-lm|Lasso",
                              res$method, ignore.case=TRUE), "LFC-based", "sample-wise")
+    res$type[grep("limma",res$method)] <- "sample-wise"
   }
   cols <- setNames(c("#CC6677", "#4477AA"), unique(res$type))
   res2 <- aggregate(res[,intersect(c("Sensitivity", "FDR","archFDR"),colnames(res))],
