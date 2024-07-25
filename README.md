@@ -1,6 +1,6 @@
 # Benchmark of Differential TF activity methods
 
-This repository contains the code used in Gerbaldo, Sonder et al., for the benchmark of differential TF activity methods based on ATAC-seq data.
+This repository contains the code used in [Gerbaldo, Sonder et al.](https://doi.org/10.1101/2024.03.06.583825), for the benchmark of differential TF activity methods based on ATAC-seq data.
 
 ## Repository structure
 
