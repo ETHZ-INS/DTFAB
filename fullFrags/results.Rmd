@@ -20,7 +20,7 @@ archs <- list(h=readRDS("../misc/mergedMotifs.human.rds"),
 ```{r, eval=FALSE}
 datasets <- getDatasets()
 res <- compileBenchmark(datasets, interactors=interactors, archetypes = archs)
-res <- res[res$method!="dev" & !grepl("trend$|ihw$|^CVb|noI$",res$method),]
+res <- res[res$method!="dev" & !grepl("trend$|ihw$|^CVb|noI|decoupleRudt$",res$method),]
 res <- renameMethods(res)
 # time was recorded only for the main chromVAR variants, so use that for all
 cvtime <- colMeans(as.matrix(
@@ -41,6 +41,7 @@ res3 <- filterMethods(res)
 ```{r, fig.width=8, fig.height=10, eval=FALSE}
 # quick check
 res <- readRDS("results.rds")
+resHeatmap(res)
 h1 <- rankHeatmap2(res, doDraw = FALSE)
 draw(h1)
 ```

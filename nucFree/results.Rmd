@@ -13,10 +13,12 @@ source("../Scripts/runMethods.R")
 source("../Scripts/compileBenchmark.R")
 source("../Scripts/plot.R")
 interactors <- readRDS("../Scripts/allInteractors.rds")
+archs <- list(h=readRDS("../misc/mergedMotifs.human.rds"),
+              m=readRDS("../misc/mergedMotifs.mouse.rds"))
 ```
 
 ```{r, eval=FALSE}
-res <- compileBenchmark(getDatasets(TRUE), interactors=interactors)
+res <- compileBenchmark(getDatasets(TRUE), interactors=interactors, archetypes = archs)
 saveRDS(res, "results.rds")
 ```
 
