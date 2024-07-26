@@ -1,0 +1,100 @@
+---
+title: "convert_motif_scans_diffTF"
+output: html_document
+date: "2024-06-05"
+---
+
+```{r setup, include=FALSE}
+library(data.table)
+library(GenomicRanges)
+library(GenomicInteractions)
+library(rtracklayer)
+library(jsonlite)
+```
+
+```{r, datasets to test}
+dataDir <- "../data/data_baseline"
+baseDir <- "data_baseline"
+refDir <- "./reference/hg38.chrom.sizes"
+```
+
+convert motifs
+```{r, convert motifs, eval=FALSE}
+pm <- readRDS(file.path(dataDir, "runATAC_results", "others", "pmoi.rds"))
+pm <- as.data.table(pm)
+pm <- split(pm, by="motif_id")
+  
+outDir <- file.path("./motif_scans", baseDir)
+if(!file.exists(outDir)) dir.create(outDir)
+
+lapply(names(pm), function(tf){
+    pms <- pm[[tf]]
+    pms <- makeGRangesFromDataFrame(as.data.frame(pms))
+    export.bed(pms, file.path(outDir, paste0(tf,"_TFBS", ".bed")), format="bed")})
+```
+
+```{r, run diffTF}
+dataDir <- "../data/data_baseline"
+outBaseDir <- "./res"
+
+datOv <- data.table(SampleID=c("CTRL1", "CTRL2", "CTRL3", 
+                               "TRT1", "TRT2", "TRT3"),
+                    Condition=c("Group1", "Group1", "Group1", 
+                                "Group2", "Group2", "Group2"))
+datOv[,conditionSummary:=Condition]
+  
+# peak coordinates of consensus peaks
+# Actually its a narrowPeak file but saved as bed for compatibility
+consPeaksDir <- "../data/peaks/merged_peaks.bed" 
+  
+# consensus peak directory (also written to sample information file)
+datOv$Peaks <- consPeaksDir
+bedDir <-  file.path(dataDir, "seq_files")
+  
+if(sum(grepl(".bam", list.files(bedDir)))<6){
+  bedFiles <- list.files(bedDir, pattern=".bed")
+  bedFiles <- bedFiles[!grepl(".bedpe", bedFiles)]
+  lapply(bedFiles, function(file){
+    
+    fileName <- unlist(tstrsplit(file, split=".", fixed=TRUE, keep=1))
+    filePathBed <- file.path(bedDir, paste(fileName, "bed", sep="."))
+    filePathBam <- file.path(bedDir, paste(fileName, "bam", sep="."))
+    
+  frags <- fread(filePathBed)
+  frags <- subset(frags, V1 %in% paste0("chr", 1:22))
+  frags[,start:=pmin(V2,V5)]
+  frags[,end:=pmax(V3, V6)]
+  colnames(frags)
+  frags <- frags[,c("V1", "start", "end", "V7", "V8", "V10"), with=FALSE]
+  setnames(frags, c("V1", "V7", "V8", "V10"), c("seqnames", "name", "score", "strand"))
+  frags$strand <- "*"
+  write.table(frags,
+              filePathBed,
+              quote=FALSE, col.names=FALSE,
+              sep="\t",
+              row.names=FALSE)
+    
+    cmd <- paste("bedToBam -ubam -g", refDir, "-i", filePathBed, ">", filePathBam, sep=" ")
+    system(cmd, wait=TRUE)
+  })}
+
+
+bamDirs <- file.path(bedDir, paste(datOv$SampleID, "bam", sep="."))
+datOv$bamReads <- bamDirs
+write.table(datOv, file="simData_baseline.tsv" , sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
+
+#  motif scan directory
+tfbsDir <- file.path("./motif_scans", baseDir)
+outDir <- file.path(outBaseDir, baseDir)
+  
+# adapt config
+config <- fromJSON("config_baseline.json")
+config$peaks$consensusPeaks <- consPeaksDir
+config$additionalInputFiles$dir_TFBS <- tfbsDir
+config$par_general$outdir <- outDir
+  
+write(toJSON(config, pretty=TRUE, auto_unbox=TRUE), "config_baseline.json")
+
+# run diffTF
+system("bash startAnalysis_baseline.sh", wait=TRUE)
+```

@@ -1,0 +1,76 @@
+---
+title: "02_run_diffTF"
+output: html_document
+date: "2024-06-05"
+---
+
+```{r setup, include=FALSE}
+library(data.table)
+library(GenomicRanges)
+library(GenomicInteractions)
+library(rtracklayer)
+library(jsonlite)
+```
+
+```{r, datasets to test}
+datasets <- list.files("../data/sim_data_es")
+datasets <- datasets[!grepl("_0_", datasets)]
+refDir <- "./reference/hg38.chrom.sizes"
+```
+
+```{r, run diffTF}
+dataDir <- "../data/sim_data_es"
+outBaseDir <- "./res"
+
+# loop over datasets & change config
+lapply(datasets, function(ds){
+  
+  # adapt simData.tsv
+  datOv <- fread("simData.tsv")
+  
+  # peak coordinates of consensus peaks
+  consPeaksDir <- file.path(dataDir, ds, "peaks", "merged_peaks.bed")
+  
+  # consensus peak directory (also written to sample information file)
+  datOv$Peaks <- consPeaksDir
+  bedDir <-  file.path(dataDir, ds, "seq_files")
+  
+  if(sum(grepl(".bam", list.files(bedDir)))<6){
+    bedFiles <- list.files(bedDir, pattern=".bed")
+    bedFiles <- bedFiles[!grepl(".bedpe", bedFiles)]
+    lapply(bedFiles, function(file){
+    
+      fileName <- unlist(tstrsplit(file, split=".", fixed=TRUE, keep=1))
+      filePathBed <- file.path(bedDir, paste(fileName, "bed", sep="."))
+      filePathBam <- file.path(bedDir, paste(fileName, "bam", sep="."))
+    
+      cmd <- paste("bedToBam -ubam -g", refDir, "-i", filePathBed, ">", filePathBam, sep=" ")
+      system(cmd, wait=TRUE)
+    })}
+  
+  bamDirs <- file.path(bedDir, paste(datOv$SampleID, "bam", sep="."))
+  datOv$bamReads <- bamDirs
+  write.table(datOv, file="simData.tsv" , sep="\t", col.names=TRUE, row.names=FALSE, quote=FALSE)
+  
+  #  motif scan directory
+  tfbsDir <- file.path("./motif_scans", ds)
+  outDir <- file.path(outBaseDir, ds)
+  
+  # adapt config
+  getwd()
+  config <- fromJSON("config.json")
+  config$peaks$consensusPeaks <- consPeaksDir
+  config$additionalInputFiles$dir_TFBS <- tfbsDir
+  config$par_general$outdir <- outDir
+  
+  write(toJSON(config, pretty=TRUE, auto_unbox=TRUE), "config.json")
+  
+  # run diffTF
+  system("bash startAnalysis.sh", wait=TRUE)
+  Sys.sleep(3600)
+})
+```
+
+```{r}
+sessionInfo()
+```

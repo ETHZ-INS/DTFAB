@@ -1,0 +1,7 @@
+SampleID	Condition	conditionSummary	Peaks	bamReads
+CTRL1	Group1	Group1	../data/peaks/merged_peaks.bed	../data/data_baseline/seq_files/CTRL1.bam
+CTRL2	Group1	Group1	../data/peaks/merged_peaks.bed	../data/data_baseline/seq_files/CTRL2.bam
+CTRL3	Group1	Group1	../data/peaks/merged_peaks.bed	../data/data_baseline/seq_files/CTRL3.bam
+TRT1	Group2	Group2	../data/peaks/merged_peaks.bed	../data/data_baseline/seq_files/TRT1.bam
+TRT2	Group2	Group2	../data/peaks/merged_peaks.bed	../data/data_baseline/seq_files/TRT2.bam
+TRT3	Group2	Group2	../data/peaks/merged_peaks.bed	../data/data_baseline/seq_files/TRT3.bam

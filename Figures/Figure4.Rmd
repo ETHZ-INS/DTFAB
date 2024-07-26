@@ -1,5 +1,5 @@
 ---
-title: "Figure 3"
+title: "Figure 4"
 output: html_document
 ---
 
@@ -29,6 +29,14 @@ cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73",
                 "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 ```
 
+```{r, selected methods}
+selMethods <- c("chromVAR:differentialDeviations", 
+                "chromVAR(z)>limma",
+                "chromVAR(z)>Qt>limma",
+                "GC>fastMLM>limma", 
+                "msVIPER(binary)",
+                "monaLisa.vsOthers")
+```
 
 ```{r, error=TRUE}
 # Import method outputs
@@ -70,6 +78,8 @@ resBase <- lapply(1:nrow(params), function(i){
 resBase <- rbindlist(resBase)
 res <- rbind(res, resBase, use.names=TRUE, fill=TRUE)
 res <- renameMethods(res)
+res <- subset(res, method %in% selMethods)
+
 
 # calculate ranks
 res[,rank:=order(p, -abs(logFC)), , by=c("tf", "paradigm", "es", "method")]
@@ -153,7 +163,7 @@ lfcDist <- ggplot(lfc, aes(x=enr, y=lfc))+
   facet_grid(cols=vars(type), scales="free")+
   geom_pointdensity()+
   geom_hline(yintercept=0, linetype="dashed")+
-  scale_color_viridis(option="A")+
+  scale_color_viridis(option="A", name="point density")+
   ylab("Log fold change")+
   xlab("Enrichment over input")+
   labs(tag="B")+
@@ -161,6 +171,8 @@ lfcDist <- ggplot(lfc, aes(x=enr, y=lfc))+
   theme(legend.position="bottom",
         strip.text = element_text(size=12),
         plot.tag = element_text(face="bold", size=16))
+
+lfcDist
 ```
 
 

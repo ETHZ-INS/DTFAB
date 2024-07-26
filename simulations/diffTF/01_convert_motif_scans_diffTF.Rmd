@@ -1,0 +1,34 @@
+---
+title: "convert_motif_scans_diffTF"
+output: html_document
+date: "2024-06-05"
+---
+
+```{r setup, include=FALSE}
+library(data.table)
+library(GenomicRanges)
+library(rtracklayer)
+```
+
+# Convert motifs
+
+```{r}
+pmois <- list.files("../data/sim_data_es", recursive=TRUE, full.names=TRUE)
+pmois <- pmois[grepl("pmoi", pmois)]
+
+lapply(pmois, function(pm){
+  baseDir <- unlist(tstrsplit(pm, split="/", keep=4))
+  
+  pm <- readRDS(pm)
+  pm <- as.data.table(pm)
+  pm <- split(pm, by="motif_id")
+  
+  outDir <- file.path("./motif_scans", baseDir)
+  if(!file.exists(outDir)) dir.create(outDir)
+
+  lapply(names(pm), function(tf){
+    pms <- pm[[tf]]
+    pms <- makeGRangesFromDataFrame(as.data.frame(pms))
+    export.bed(pms, file.path(outDir, paste0(tf,"_TFBS", ".bed")), format="bed")})
+})
+```

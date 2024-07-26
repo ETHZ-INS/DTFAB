@@ -53,7 +53,7 @@ sensFDRplot <- function(res, fade=NULL, PR=TRUE, hull=TRUE, label.size=3.5, long
   res$FDR[which(is.na(res$FDR))] <- 0
   if(!is.null(res$archFDR)) res$archFDR[which(is.na(res$archFDR))] <- 0
   if(is.null(res$type)){
-    res$type <- ifelse(grepl("GSEA|ulm|msViper|decoupleR|MonaLisa|diffTF|-lm|Lasso",
+    res$type <- ifelse(grepl("GSEA|ulm|msViper|decoupleR|MonaLisa|diffTF|-lm|Lasso|meirlop",
                              res$method, ignore.case=TRUE), "LFC-based", "sample-wise")
     res$type[grep("limma",res$method)] <- "sample-wise"
   }
