@@ -1,0 +1,7 @@
+SampleID	Condition	conditionSummary	Peaks	bamReads
+group1_1	Group1	Group1	../data/sim_data_es/CEBPB_haploinsufficiency_3_FALSE/peaks/merged_peaks.bed	../data/sim_data_es/CEBPB_haploinsufficiency_3_FALSE/seq_files/group1_1.bam
+group1_2	Group1	Group1	../data/sim_data_es/CEBPB_haploinsufficiency_3_FALSE/peaks/merged_peaks.bed	../data/sim_data_es/CEBPB_haploinsufficiency_3_FALSE/seq_files/group1_2.bam
+group1_3	Group1	Group1	../data/sim_data_es/CEBPB_haploinsufficiency_3_FALSE/peaks/merged_peaks.bed	../data/sim_data_es/CEBPB_haploinsufficiency_3_FALSE/seq_files/group1_3.bam
+group2_1	Group2	Group2	../data/sim_data_es/CEBPB_haploinsufficiency_3_FALSE/peaks/merged_peaks.bed	../data/sim_data_es/CEBPB_haploinsufficiency_3_FALSE/seq_files/group2_1.bam
+group2_2	Group2	Group2	../data/sim_data_es/CEBPB_haploinsufficiency_3_FALSE/peaks/merged_peaks.bed	../data/sim_data_es/CEBPB_haploinsufficiency_3_FALSE/seq_files/group2_2.bam
+group2_3	Group2	Group2	../data/sim_data_es/CEBPB_haploinsufficiency_3_FALSE/peaks/merged_peaks.bed	../data/sim_data_es/CEBPB_haploinsufficiency_3_FALSE/seq_files/group2_3.bam

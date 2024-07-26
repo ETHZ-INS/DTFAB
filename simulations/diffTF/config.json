@@ -1,0 +1,34 @@
+{
+  "par_general": {
+    "outdir": "./res/CEBPB_haploinsufficiency_3_FALSE",
+    "maxCoresPerRule": 8,
+    "dir_TFBS_sorted": false,
+    "regionExtension": 100,
+    "comparisonType": "Group1vsGroup2.all",
+    "conditionComparison": "Group1,Group2",
+    "designContrast": "~ conditionSummary",
+    "designVariableTypes": "conditionSummary:factor",
+    "nPermutations": 0,
+    "nBootstraps": 1000,
+    "nCGBins": 10,
+    "TFs": "all",
+    "dir_scripts": "./diffTF/src/R",
+    "RNASeqIntegration": false,
+    "debugMode": false
+  },
+  "samples": {
+    "summaryFile": "simData.tsv",
+    "pairedEnd": false
+  },
+  "peaks": {
+    "consensusPeaks": "../data/sim_data_es/CEBPB_haploinsufficiency_3_FALSE/peaks/merged_peaks.bed",
+    "peakType": "bed",
+    "minOverlap": 2
+  },
+  "additionalInputFiles": {
+    "refGenome_fasta": "./reference/hg38.fa",
+    "dir_TFBS": "./motif_scans/CEBPB_haploinsufficiency_3_FALSE",
+    "RNASeqCounts": "",
+    "HOCOMOCO_mapping": ""
+  }
+}
