@@ -20,6 +20,7 @@ data.table::setDTthreads(2)
 source("./scripts/atacSignalSimulation.R")
 source("../Scripts/runMethods.R")
 source("../Scripts/compileBenchmark.R")
+source("../Scripts/getInteractors.R")
 ```
 
 ```{r, paths}
@@ -142,7 +143,7 @@ lapply(1:nrow(simParams), function(i){
 # Benchmark 
 
 Run methods
-```{r, run methods, eval=FALSE}
+```{r, run methods, eval=TRUE}
 simParams[,folderName:=paste(tf, paradigm, es, vary_atac_peaks, sep="_")]
 subSimParams <- simParams
 
@@ -159,61 +160,8 @@ datasets <- lapply(1:nrow(subSimParams), function(i){
 names(datasets) <- subSimParams$folderName
 
 runAll(datasets, scriptsFolder="../../../../Scripts", 
-       methods=c("chromVAR", "minaLisa.others", "monaLisa.zero", "StabSel", "fastMLM"), 
-       forceRerun=TRUE)
-```
-
-benchmark results
-```{r, compile benchmark, eval=TRUE}
-# change name of TF
-datasets <- lapply(datasets, function(ds){
-  if(grepl("ZN", ds$truth))
-  {
-    ds$truth <- c("ZN143", "ZNF143")
-  }
-  ds
-})
-
-interactors <- getAllInteractors(NULL, extra=c("CEBPB","CTCF", "MAZ", "ZNF143"))
-res <- compileBenchmark(datasets, interactors=interactors)
-res$dataset <- rep(names(datasets), each=length(unique(res$method)))
-res <- as.data.table(res)
-
-# add baseline datasets
-paramsBase <- as.data.table(expand.grid(tfs=unique(subSimParams$tf),
-                            paradigm=unique(subSimParams$paradigm)))
-paramsBase[,folder_name:=paste(tfs, paradigm, 0, FALSE, sep="_")]
-baselineDatasets <- lapply(1:nrow(paramsBase), function(i){
-  tf <- paramsBase[i,]$tfs
-  ds <- list(truth=tf,
-             species="h", 
-             type="sim",
-             seqStyle="UCSC",
-             folder="./data/data_baseline",
-             readType="bed")
-  
-  if(grepl("ZN", ds$truth))
-  {
-    ds$truth <- c("ZN143", "ZNF143")
-  }
-  
-  return(ds)
-})
-
-names(baselineDatasets) <- paramsBase$folder_name
-
-resBase <- lapply(1:length(baselineDatasets), function(i){
-  ds <- list(baselineDatasets[[i]])
-  names(ds) <- names(baselineDatasets)[[i]]
-  res <- compileBenchmark(ds, interactors=interactors)
-  res <- as.data.table(res)
-  res$dataset <- names(baselineDatasets)[[i]]
-  res
-})
-
-resBase <- rbindlist(resBase)
-res <- rbind(res, resBase)
-saveRDS(res, "res_all_effect_strength.rds")
+       methods=setdiff(getMethods(), c("ATACseqTFEA")),
+       forceRerun=FALSE)
 ```
 
 # Sessioninfo 
