@@ -38,15 +38,19 @@ rawFilesBaseline <- rawFilesBaseline[grepl("countmatrix.rds", rawFilesBaseline)]
 
 peakZNF143Ranges <- fread("./data/ChIP_peaks/ENCFF500EWB_ZNF143.bed.gz", 
                     select=1:3, col.names=c("chr", "start", "end"))
+peakZNF143Ranges <- subset(peakZNF143Ranges, chr %in% paste0("chr", 1:22))
 peakZNF143Ranges <- makeGRangesFromDataFrame(as.data.frame(peakZNF143Ranges))
 peakMAZRanges <- fread("./data/ChIP_peaks/ENCFF250FJC_MAZ.bed.gz", 
                     select=1:3, col.names=c("chr", "start", "end"))
+peakMAZRanges <- subset(peakMAZRanges, chr %in% paste0("chr", 1:22))
 peakMAZRanges <- makeGRangesFromDataFrame(as.data.frame(peakMAZRanges))
 peakCEBPBRanges <- fread("./data/ChIP_peaks/ENCFF156OCY_CEBPB.bed.gz", 
                     select=1:3, col.names=c("chr", "start", "end"))
+peakCEBPBRanges <- subset(peakCEBPBRanges, chr %in% paste0("chr", 1:22))
 peakCEBPBRanges <- makeGRangesFromDataFrame(as.data.frame(peakCEBPBRanges))
 peakCTCFRanges <- fread("./data/ChIP_peaks/ENCFF592UDD_CTCF.bed.gz", 
                     select=1:3, col.names=c("chr", "start", "end"))
+peakCTCFRanges <- subset(peakCTCFRanges, chr %in% paste0("chr", 1:22))
 peakCTCFRanges <- makeGRangesFromDataFrame(as.data.frame(peakCTCFRanges))
 ```
 
@@ -60,6 +64,10 @@ countMats <- lapply(rawFiles, function(file){
     
     motifRanges <- readRDS(file.path(dirname(file), "pmoi.rds"))
     motifRanges <- motifRanges[motifRanges$motif_id=="ZN143"]
+    motifRanges <- as.data.table(motifRanges)
+    motifRanges <- subset(motifRanges, seqnames %in% paste0("chr", 1:22))
+    motifRanges <- makeGRangesFromDataFrame(as.data.frame(motifRanges), 
+                                          keep.extra.columns=TRUE)
     
     ovMotif <- overlapsAny(rowRanges(se), motifRanges)
     ovMotif <- fifelse(ovMotif, "overlaps motif", "no overlap")
@@ -70,6 +78,10 @@ countMats <- lapply(rawFiles, function(file){
     
     motifRanges <- readRDS(file.path(dirname(file), "pmoi.rds"))
     motifRanges <- motifRanges[motifRanges$motif_id=="CEBPB"]
+    motifRanges <- as.data.table(motifRanges)
+    motifRanges <- subset(motifRanges, seqnames %in% paste0("chr", 1:22))
+    motifRanges <- makeGRangesFromDataFrame(as.data.frame(motifRanges), 
+                                          keep.extra.columns=TRUE)
     
     ovMotif <- overlapsAny(rowRanges(se), motifRanges)
     ovMotif <- fifelse(ovMotif, "overlaps motif", "no overlap")
@@ -80,6 +92,10 @@ countMats <- lapply(rawFiles, function(file){
     
     motifRanges <- readRDS(file.path(dirname(file), "pmoi.rds"))
     motifRanges <- motifRanges[motifRanges$motif_id=="MAZ"]
+    motifRanges <- as.data.table(motifRanges)
+    motifRanges <- subset(motifRanges, seqnames %in% paste0("chr", 1:22))
+    motifRanges <- makeGRangesFromDataFrame(as.data.frame(motifRanges), 
+                                          keep.extra.columns=TRUE)
     
     ovMotif <- overlapsAny(rowRanges(se), motifRanges)
     ovMotif <- fifelse(ovMotif, "overlaps motif", "no overlap")
@@ -90,6 +106,10 @@ countMats <- lapply(rawFiles, function(file){
     
     motifRanges <- readRDS(file.path(dirname(file), "pmoi.rds"))
     motifRanges <- motifRanges[motifRanges$motif_id=="CTCF"]
+    motifRanges <- as.data.table(motifRanges)
+    motifRanges <- subset(motifRanges, seqnames %in% paste0("chr", 1:22))
+    motifRanges <- makeGRangesFromDataFrame(as.data.frame(motifRanges), 
+                                          keep.extra.columns=TRUE)
     
     ovMotif <- overlapsAny(rowRanges(se), motifRanges)
     ovMotif <- fifelse(ovMotif, "overlaps motif", "no overlap")
@@ -124,6 +144,10 @@ countMatsBaseline <- lapply(c("CEBPB", "CTCF", "MAZ", "ZNF143"), function(tf){
     
     motifRanges <- readRDS(file.path(dirname(rawFilesBaseline), "pmoi.rds"))
     motifRanges <- motifRanges[motifRanges$motif_id=="ZN143"]
+    motifRanges <- as.data.table(motifRanges)
+    motifRanges <- subset(motifRanges, seqnames %in% paste0("chr", 1:22))
+    motifRanges <- makeGRangesFromDataFrame(as.data.frame(motifRanges), 
+                                          keep.extra.columns=TRUE)
     
     ovMotif <- overlapsAny(rowRanges(se), motifRanges)
     ovMotif <- fifelse(ovMotif, "overlaps motif", "no overlap")
@@ -134,6 +158,10 @@ countMatsBaseline <- lapply(c("CEBPB", "CTCF", "MAZ", "ZNF143"), function(tf){
     
     motifRanges <- readRDS(file.path(dirname(rawFilesBaseline), "pmoi.rds"))
     motifRanges <- motifRanges[motifRanges$motif_id=="CEBPB"]
+    motifRanges <- as.data.table(motifRanges)
+    motifRanges <- subset(motifRanges, seqnames %in% paste0("chr", 1:22))
+    motifRanges <- makeGRangesFromDataFrame(as.data.frame(motifRanges), 
+                                          keep.extra.columns=TRUE)
     
     ovMotif <- overlapsAny(rowRanges(se), motifRanges)
     ovMotif <- fifelse(ovMotif, "overlaps motif", "no overlap")
@@ -144,6 +172,10 @@ countMatsBaseline <- lapply(c("CEBPB", "CTCF", "MAZ", "ZNF143"), function(tf){
     
     motifRanges <- readRDS(file.path(dirname(rawFilesBaseline), "pmoi.rds"))
     motifRanges <- motifRanges[motifRanges$motif_id=="MAZ"]
+    motifRanges <- as.data.table(motifRanges)
+    motifRanges <- subset(motifRanges, seqnames %in% paste0("chr", 1:22))
+    motifRanges <- makeGRangesFromDataFrame(as.data.frame(motifRanges), 
+                                          keep.extra.columns=TRUE)
     
     ovMotif <- overlapsAny(rowRanges(se), motifRanges)
     ovMotif <- fifelse(ovMotif, "overlaps motif", "no overlap")
@@ -154,6 +186,10 @@ countMatsBaseline <- lapply(c("CEBPB", "CTCF", "MAZ", "ZNF143"), function(tf){
     
     motifRanges <- readRDS(file.path(dirname(rawFilesBaseline), "pmoi.rds"))
     motifRanges <- motifRanges[motifRanges$motif_id=="CTCF"]
+    motifRanges <- as.data.table(motifRanges)
+    motifRanges <- subset(motifRanges, seqnames %in% paste0("chr", 1:22))
+    motifRanges <- makeGRangesFromDataFrame(as.data.frame(motifRanges), 
+                                          keep.extra.columns=TRUE)
     
     ovMotif <- overlapsAny(rowRanges(se), motifRanges)
     ovMotif <- fifelse(ovMotif, "overlaps motif", "no overlap")
@@ -218,6 +254,9 @@ freqAll <- lapply(rawFiles, function(file){
   
   motifRanges <- readRDS(file.path(dirname(file), "pmoi.rds"))
   motifDt <- as.data.table(motifRanges)
+  motifDt <- subset(motifDt, seqnames %in% paste0("chr", 1:22))
+  motifRanges <- makeGRangesFromDataFrame(as.data.frame(motifDt), 
+                                          keep.extra.columns=TRUE)
   motifDt$overlaps_chip_motif <- overlapsAny(motifRanges, peakRanges)
     
   hits <- findOverlaps(rowRanges(se), motifRanges, select="all")

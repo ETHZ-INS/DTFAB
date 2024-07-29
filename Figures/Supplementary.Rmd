@@ -5,6 +5,7 @@ date: "`r format(Sys.time(), '%d %B, %Y')`"
 author: "Gerbaldo, Sonder et al."
 output:
   pdf_document:
+    latex_engine: xelatex
     fig_width: 8
     fig_height: 6
 ---
@@ -68,7 +69,7 @@ cowplot::plot_grid(
 )
 ```
 
-**`r getFigNb()` : Overview of the benchmark datasets and TFs. **
+**`r getFigNb()`: Overview of the benchmark datasets and TFs. **           
 **A:** Volcano plot of the peak-level differential accessibility analyses, 
 illustrating the extent and significance of changes upon treatment in each dataset.
 The dashed line represents a 0.05 FDR threshold, and indicated are the number of
@@ -176,15 +177,15 @@ plot_grid(plot_grid(p1,p2,nrow=1,labels="AUTO",scale=0.95),
 
 
 **`r getFigNb()`** 
-**A: Reproducibility of chromVAR-based differential accessibility ananylsis.**
+**A: Reproducibility of chromVAR-based differential accessibility analysis.**
 Each color represents a dataset. The line and shaded area respectively represent 
 the mean and standard error of the pairwise correlations across 7 independent 
 runs of the chromVAR(z-score)>limma pipeline for each dataset and setting, of 
 the ranks of the (union of) top 20 motifs.
 **B: Illustration of the motif-specific position weights for the insertionModel method.**
 **C: Illustration of the computation of the network score.** 
-The motifs/TFs are ranked for each method, and for each k=1:100 the proportion of 
-top k TFs that are part of the known network of the true TF is computed. 
+The motifs are ranked for each method, and for each k=1:100 the proportion of 
+top k motifs that are part of the known network of the true TF is computed. 
 The area under the curve is then reported, relative to the AUC of the best 
 possible motif ordering for that factor (gray area). The example plotted here is
 from the GATA1 dataset. 
@@ -413,17 +414,17 @@ plot_grid(grid.grabExpr(draw(h1)), grid.grabExpr(draw(h2)), p, nrow=3, rel_heigh
 normalizing the chromVAR activity scores (i.e. z-scores or deviations) 
 distributions across samples before running limma. In **B**, for datasets where 
 a downregulation was expected, the *t*-values were inverted. The heatmap colors
-show the method's deviation relative to the dataset average, while the numbers
+show the methods deviation relative to the dataset average, while the numbers
 indicate the actual (rounded) *t*-value.
 **C:** Impact on the single-cell z-scores. As a proxy to signal-to-noise ratio, 
 we computed the standardized mean difference of the respective motif for each 
 guide RNA (individual lines) to the mean of the control guide RNAs. Centering 
 is always beneficial (Wilcoxon 
-p<`r format(wilcox.test(d$difference[d$assay=="centered"], alternative="greater")$p.value, digits=1)`),
+p-value < `r format(wilcox.test(d$difference[d$assay=="centered"], alternative="greater")$p.value, digits=1)`),
 unit-variance scaling is often beneficial (Wilcoxon 
-p~`r format(wilcox.test(d$difference[d$assay=="scaled"], alternative="greater")$p.value, digits=1)`) 
+p-value ~ `r format(wilcox.test(d$difference[d$assay=="scaled"], alternative="greater")$p.value, digits=1)`) 
 but sometimes detrimental, and quantile normalization also tends to be beneficial 
-(Wilcoxon p~`r format(wilcox.test(d$difference[d$assay=="quantile"], alternative="greater")$p.value, digits=2)`).
+(Wilcoxon p-value ~ `r format(wilcox.test(d$difference[d$assay=="quantile"], alternative="greater")$p.value, digits=2)`).
 
 
 
@@ -450,7 +451,7 @@ h <- grid.grabExpr(draw(h1 + h2, merge=TRUE))
 plot_grid(h, scale=0.95)
 ```
 
-**`r getFigNb()` : Rank-based metrics of all variants, including smooth quantile normalization in GC bins.**
+**`r getFigNb()`: Rank-based metrics of all variants, including smooth quantile normalization in GC bins.**
 Same as Figure 1, but showing all method variants tested.
 
 
@@ -484,7 +485,7 @@ plot_grid(grid.grabExpr(draw(h), wrap.grobs = TRUE), p,
 ```
 
 
-**`r getFigNb()` : Impact of stringency in motif matching.** 
+**`r getFigNb()`: Impact of stringency in motif matching.** 
 Rank of the true TF (**A**) and Precision-Recall (**B**) of selected methods,
 when using a stringent motif matching vs the default.
 
@@ -518,7 +519,7 @@ plot_grid(grid.grabExpr(draw(h), wrap.grobs = TRUE), p, scale=0.95,
 ```
 
 
-**`r getFigNb()` : Impact of using motif archetypes.** 
+**`r getFigNb()`: Impact of using motif archetypes.** 
 Rank of the true motif/archetype (**A**) and Precision-Recall (**B**) of selected methods,
 when using motifs archetypes instead of the full collection of motifs. Given the
 difference in the size of the two sets of motifs, ranks were capped at 144 for 
@@ -559,7 +560,7 @@ ggplot(m, aes(rank.x, rank.y, label=dataset, colour=diffsign)) +
 ```
 
 
-**`r getFigNb()`: Impact of using nucelosome-free fragments.** 
+**`r getFigNb()`: Impact of using nucleosome-free fragments.** 
 Comparison of the rank of the true motif obtained by the top method of each 
 family of approaches, when using alternative peaks or overlap counts based on
 nucleosome-free fragments. 'All frags on NF peaks' stands for counting overlaps
@@ -567,7 +568,7 @@ with fragments of any size, but on peaks called on nucleosome-free (NF) fragment
 only. 'NF frags on NF peaks' stands for using only NF-fragments, i.e. counting 
 overlaps of NF fragments on peaks called only on NF fragments. Finally, 
 'NF frags on full peaks' stands for counting overlaps of only NF fragments, but
-on the standard peaks (called using all fragments).
+on the standard peaks (called using all fragments). 
 
 \newpage
 
@@ -598,12 +599,12 @@ plot_grid(p1, sensFDRplot(bml2, hull=FALSE) +
           nrow=2, labels="AUTO", scale=0.95)
 ```
 
-**`r getFigNb()` : Simple aggregation of top methods' results does not improve inferences.**
-The results of the top method from each of the two families of approach (on the left) 
+**`r getFigNb()`: Simple aggregation of top methods' results does not improve inferences.**
+**A**. The results of the top method from each of the two families of approach (on the left) 
 are compared to those of simple aggregation methods (on the right). Beside the
 established Fisher's, Stouffer's and Simes' methods, a rank-based permutation approach
 was tested, establishing the probability of having a sum of ranks across methods 
-lower or equal to the observed one.
+lower or equal to the observed one. We also tested using limma on merged per-sample activity scores from chromVAR and GCsmooth+MLM. **B**. Same comparison, in terms of Precision and Recall at adjusted p-value $<=0.05$.
 
 
 
@@ -634,6 +635,5 @@ plot_grid( ggdraw() + draw_image("traftac_WB.png") + coord_cartesian(expand=0),
 ```
 
 
-**`r getFigNb()` : Western blot confirms the downregulation of p50/NfKB.**
-Western blot (**A**) and corresponding densitometry (**B**) showing a downregulation of 
-p50/NFkB in HEK cells treated with NFkB TRAFTACs versus scrambled TRAFTACs.
+**`r getFigNb()`: Successful downregulation of NFkB1 at the protein-level using the TRAFTAC.**
+Western Blot (**A**) and derived densitometry (**B**) of NFkB1 (aka p50) in HEK cells transfected with the dCas9-HT7 plasmid and a TRAFTAC (either against NFkB or a scrambled control) for 6h, before treating the cells TNF-$\alpha$ (to trigger NFkB activation) and the PROTAC against the Halo tag (HP14) for 19h. The DMSO control sample was the same as a NFkB1, except that it received DMSO instead of the PROTAC.
