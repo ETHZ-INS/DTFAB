@@ -25,7 +25,6 @@ source("../Scripts/compileBenchmark.R")
 ```{r, paths}
 outDir <- "./data/sim_data_es"
 bedBaseDir <- "./data/ATAC_beds"
-atacPeaksPath <- "./data/peaks/merged_peaks.narrowPeak"
 
 # Baseline samples 
 bedPaths <- paste(bedBaseDir, c("ENCFF495DQP.rds", "ENCFF130DND.rds", 
@@ -42,39 +41,42 @@ file.copy("./data/ATAC_beds/ENCFF358GWK.bam_sorted.bed", "./data/data_baseline/s
 file.copy("./data/ATAC_beds/ENCFF963YZH.bam_sorted.bed", "./data/data_baseline/seq_files/TRT3.bed")
 ```
 
+Reformat & subset to chromosomes 1-22:
+```{r, subset chrs, eval=FALSE}
+bedFiles <- list.files("./data/data_baseline/seq_files", full.names=TRUE)
+lapply(bedFiles[1:6], function(file){
+  frags <- fread(file)
+  frags <- subset(frags, V1 %in% paste0("chr", 1:22))
+  frags[,start:=pmin(V2,V5)]
+  frags[,end:=pmax(V3, V6)]
+  colnames(frags)
+  frags <- frags[,c("V1", "start", "end", "V7", "V8", "V10"), with=FALSE]
+  setnames(frags, c("V1", "V7", "V8", "V10"), c("seqnames", "name", "score", "strand"))
+  frags$strand <- "*"
+  write.table(frags,
+              file,
+              quote=FALSE, col.names=FALSE,
+              sep="\t",
+              row.names=FALSE)
+})
+```
+
 # Benchmark 
 
 Run methods
 ```{r, run methods, eval=TRUE}
-
 datasets <- list(list(truth="none",
                       species="h", 
                       type="sim",
                       seqStyle="UCSC",
-                      peakFile="../peaks/merged_peaks.narrowPeak",
+                      peakFile="../peaks/merged_peaks.bed",
                       folder="./data/data_baseline/",
                       readType="bed"))
 names(datasets) <- "data_baseline"
 
 runAll(datasets, scriptsFolder="../../../Scripts", 
-       methods=c("chromVAR", "minaLisa.others", "monaLisa.zero", "StabSel", "fastMLM"), 
+       methods=setdiff(getMethods(), c("ATACseqTFEA")),
        forceRerun=TRUE)
-```
-
-benchmark results
-```{r, compile benchmark, eval=FALSE}
-# change name of TF
-datasets <- lapply(datasets, function(ds){
-  if(grepl("ZN", ds$truth))
-  {
-    ds$truth <- "ZN143"
-  }
-  ds
-})
-
-interactors <- readRDS("../Scripts/allInteractors.rds")
-res <- compileBenchmark(datasets, interactors=interactors)
-saveRDS(res, "res_all_effect_strength.rds")
 ```
 
 # Sessioninfo 
