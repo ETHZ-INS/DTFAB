@@ -575,7 +575,7 @@ on the standard peaks (called using all fragments).
 
 # `r getFigNb(TRUE)`
 
-```{r, fig.width=5, fig.height=7.5}
+```{r, fig.width=5, fig.height=7}
 bml2 <- readRDS("../misc/aggregated.bm.rds")
 bml2b <- readRDS("../misc/MLM_CV.rds")
 bml2b$type <- "aggregation methods"

@@ -474,7 +474,7 @@ ovChIP / ovMotif
 
 
 **`r getFigNb()`: MA plots of the simulated effects.**
-For each factor, simulated paradigm and perturbation strength, the distribution of peaks log2FC of raw fragment counts between conditions as a function of mean accessibility is plotted as 2d kernel density, separating either (**A**) ATAC-seq peaks overlapping a ChIP-seq peak or not, or (**B**) ATAC-seq peaks containing a motif or not for the TF. For visibility, the peaks were subsampled to a more comparable size across the simulated datasets (1.2$\times$10^5 peaks per dataset). Colored Points indicate the means of the respective distributions.
+For each factor, simulated paradigm and perturbation strength, the distribution of peaks log2FC of raw fragment counts between conditions as a function of mean accessibility is plotted as 2d kernel density, separating either (**A**) ATAC-seq peaks overlapping a ChIP-seq peak or not, or (**B**) ATAC-seq peaks containing a motif or not for the TF. For visibility, the peaks were subsampled to a more comparable size across the semi-simulated datasets (1.2$\times$10^5 peaks per dataset). Colored Points indicate the means of the respective distributions.
 
 
 \newpage
@@ -1228,4 +1228,4 @@ tls <- ggplot(resAg,
 ```
 
 **`r getFigNb()`: Estimated precisions per dataset.**
-Heatmap of precision estimates obtained per dataset and method on the 11 real datasets (**A**), as well as averaged across each perturbation strength of the simulations (**B**).
+Heatmap of precision estimates obtained per dataset and method on the 11 real datasets (**A**), as well as averaged across each perturbation strength of the semi-simulations (**B**).
