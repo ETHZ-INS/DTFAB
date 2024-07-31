@@ -1137,9 +1137,24 @@ res <- rbind(res1, res2, use.names=TRUE, fill=TRUE)
 res$FDR[which(is.na(res$FDR))] <- 0
 res[,precision:=1-FDR]
 
+# get number of significants per method for the effect strength 0 dataset
+baseRes <- list.files("./data/data_baseline", recursive=TRUE, full.names=TRUE)
+baseRes <- baseRes[grepl("with_pvalues", baseRes)]
+baseResNames <- unlist(tstrsplit(baseRes, "/",keep=6))
+baseResNames <- unlist(tstrsplit(baseResNames, split=".", keep=1, fixed=TRUE))
+baseRes <- lapply(baseRes, readRDS)
+baseRes <- lapply(baseRes, function(br) sum(br$padj<=0.05, na.rm=TRUE))
+baseRes <- data.table(n_sig_baseline=unlist(baseRes), method=baseResNames)
+baseRes[,method:=renameMethods(method)]
+res <- merge(res, baseRes, 
+             by.x=c("method"), 
+             by.y=c("method"), all.x=TRUE, all.y=FALSE)
+
 # there is no true positive in the case of pertubation/effect strength 0
-res[,precision:=fifelse(FDR>0 & effect_strength==0 & type=="sim", 0, precision)]
+res[,precision:=fifelse((FDR>0 |trueQ<=0.05 | n_sig_baseline>0) & 
+                         effect_strength==0 & type=="sim", 0, precision)]
 res[,is_sig:=trueQ<=0.05]
+
 
 # rename simulated datasets
 res[,dataset:=fifelse(type=="sim" & paradigm=="activation", 
