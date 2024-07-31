@@ -419,12 +419,11 @@ indicate the actual (rounded) *t*-value.
 **C:** Impact on the single-cell z-scores. As a proxy to signal-to-noise ratio, 
 we computed the standardized mean difference of the respective motif for each 
 guide RNA (individual lines) to the mean of the control guide RNAs. Centering 
-is always beneficial (Wilcoxon 
-p-value < `r format(wilcox.test(d$difference[d$assay=="centered"], alternative="greater")$p.value, digits=1)`),
+is always beneficial (Wilcoxon p-value<`r format(wilcox.test(d$difference[d$assay=="centered"], alternative="greater")$p.value, digits=1)`),
 unit-variance scaling is often beneficial (Wilcoxon 
-p-value ~ `r format(wilcox.test(d$difference[d$assay=="scaled"], alternative="greater")$p.value, digits=1)`) 
+p-value~`r format(wilcox.test(d$difference[d$assay=="scaled"], alternative="greater")$p.value, digits=1)`) 
 but sometimes detrimental, and quantile normalization also tends to be beneficial 
-(Wilcoxon p-value ~ `r format(wilcox.test(d$difference[d$assay=="quantile"], alternative="greater")$p.value, digits=2)`).
+(Wilcoxon p-value~`r format(wilcox.test(d$difference[d$assay=="quantile"], alternative="greater")$p.value, digits=1)`).
 
 
 

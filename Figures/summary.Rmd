@@ -17,13 +17,13 @@ source("../Scripts/plot.R")
 ```
 
 ```{r, top methods}
-# the top 5 performant on simulated and real data (one per famili)
-topMethods <- c("monaLisa.vsOthers", # real data
+# the top 5 performant on simulated and real data (one per family)
+topMethods <- c("monaLisa.vsOthers", # real data / sim data
                 "chromVAR(z)>Qt>limma",
                 "diffTF(analytic)",
                 "decoupleR(mlm)>limma",
-                "MEIRLOP", # both
-                "msVIPER(binary)", # simulated data
+                "MEIRLOP",# simulated data
+                "msVIPER(binary)", 
                 "chromVAR(z)>limma",
                 "decoupleR(consensus)>limma",
                 "ulm+GC")

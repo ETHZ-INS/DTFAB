@@ -177,12 +177,13 @@ relAUCplot2 <- function(res, doDraw=TRUE, column_title="Datasets", name=NULL,
       m, cluster_rows=FALSE, cluster_columns=FALSE, ..., column_order=column_order,
       cell_fun=function(j, i, x, y, width, height, fill) {
         v <- gsub("^0","",round(m1[i,j],2))
-        if(is.na(v)) v <- "."
+        if(is.na(v)) v <- "NA"
         if(v=="") v <- "0"
         if(v=="NaN") v <- "NA"
         grid.text(v, x, y, gp=gpar(fontsize=ifelse(is.na(m1[i,j]),6,
                                                    cellLabelFontsize),
-                                   col=ifelse(m[i,j]<0.5,"lightgrey","black")))
+                                   col=ifelse(m[i,j]<0.5 & !is.na(m[i,j]),
+                                              "lightgrey","black")))
       },
       col=hmcolors, name=name,
       column_title=column_title, row_names_side="left", top_annotation=colan)

@@ -177,12 +177,13 @@ freqAll[,prop_co_peak_chip:=n_co_peak_chip/n_chIP_motif]
 freqAll[,rank:=frank(enr), by=.(tf, paradigm)]
 freqAll[,percentile:=rank/.N, by=.(tf, paradigm)]
 
-# get motif GC content
+# get motif GC content by summing up G & C probabilities in ppm of motif model
 motifs <- getNonRedundantMotifs(format="universal", species=c("Hsapiens"))
-motSeq <- lapply(motifs, function(m)m@consensus)
-motSeq <- data.table(seq=unlist(motSeq), motif_id=names(motSeq))
-motSeq[,GC_content:=(str_count(seq, "GC")*2)/nchar(seq)]
-freqAll <- merge(freqAll, motSeq, by="motif_id", all.x=TRUE)
+motGC <- lapply(motifs, function(m){
+  m <- m@motif
+  sum(rowSums(m[2:3,]))/sum(m)})
+motGC <- data.table(GC_content=unlist(motGC), motif_id=names(motGC))
+freqAll <- merge(freqAll, motGC, by="motif_id", all.x=TRUE)
 
 # get top enriched tfs
 freqTrueDt <- subset(freqAll, tf==motif_id)
@@ -194,6 +195,11 @@ freqTrueDt <- freqTrueDt[,c("enr", "rank", "enr_diff", "tf", "paradigm",
                             "es", "percentile", "prop",
                             "prop_co_peak", "prop_co_peak_chip", "GC_content")]
 freqTop <- subset(freqAll, rank>=max(freqAll$rank)-2)
+freqAll <- merge(freqAll, freqTrueDt[,c("tf", "paradigm", "rank")], 
+                 by.x=c("tf", "paradigm"),
+                 by.y=c("tf", "paradigm"))
+setnames(freqAll, c("rank.x", "rank.y"), c("rank", "rank_true"))
+freqTopAll <- subset(freqAll, rank>rank_true)
 
 # Rename ZN143
 freqAll[,tf:=fifelse(tf=="ZN143", "ZNF143", tf)]
@@ -234,10 +240,7 @@ coRankGC <- ggplot(subset(freqAll, paradigm=="activation"), aes(x=percentile, y=
   geom_point(aes(color=GC_content))+
   geom_point(subset(freqTrueDt, paradigm=="activation"), 
              mapping=aes(color=GC_content), size=2)+
-  scale_color_gradientn(trans = "sqrt",
-                        breaks=c(1.0,0.8,0.75,0.6,0.4,0.25,0.1,0),
-                        colours=inferno(length(unique(freqAll$GC_content))), 
-                        name="GC content")+
+  scale_color_viridis(option="B", name="Motif GC content")+
   facet_grid(cols=vars(tf))+
   ylab("Enrichment of motif\nin ATAC-peaks overlapping ChIP-peaks")+
   xlab("Enrichment quantile")+
@@ -282,18 +285,31 @@ peakGC <- data.table(tf=c(rep("CEBPB", length(gcPeakCEBPB)),
                      gc_content=c(gcPeakCEBPB, gcPeakCTCF, 
                                   gcPeakMAZ, gcPeakZNF143))
 
+# add motif GC content annotation
+freqTopAllMed <- subset(freqTopAll, paradigm=="activation")
+freqTopAllMed <- freqTopAllMed[,.(GC_content=median(GC_content, na.rm=TRUE)), 
+                               by=c("tf")]
+freqTopAllMed[,tf:=fifelse(tf=="ZN143", "ZNF143", tf)]
+freqTopAllMed$type <- "Median GC content of enriched motifs"
+freqTrueDt$type <- "GC content of true motif"
+gcAnnot <- rbind(freqTopAllMed, freqTrueDt[,c("tf", "GC_content", "type")])
+
+lineTypes <- c("Median GC content of enriched motifs"="dashed",
+               "GC content of true motif"="dotted")
 peakGCPlot <- ggplot(peakGC, aes(x=gc_content, color=tf, fill=tf))+
 geom_density(alpha=0.7)+
-scale_color_manual(values=cbbPalette)+
-scale_fill_manual(values=cbbPalette)+
+scale_color_manual(values=cbbPalette[2:5])+
+scale_fill_manual(values=cbbPalette[2:5])+
 facet_grid(cols=vars(tf))+
-geom_vline(xintercept=0.5, linetype="dashed")+
+geom_vline(data=gcAnnot, aes(xintercept=GC_content, linetype=type))+
+scale_linetype_manual(name="",values=lineTypes)+
 guides(fill = guide_legend(title="Transcription Factor"))+
+guides(fill="none")+
 guides(color="none")+
 xlab("GC content ChIP-peaks")+
 labs(tag="D")+
 theme_bw()+
-theme(legend.position="none",
+theme(legend.position="bottom",
       legend.margin=margin(l=0, r=0, t=0, b=0))
 ```
 
@@ -305,7 +321,7 @@ plot_grid(motifPlot & theme(plot.tag = element_text(face="bold", size=16)), righ
 
 
 **`r getFigNb()`: Overview of the simulated TFs.** Data shown correspond to the semi-simulated datasets with a pertubation strength of 1 in the activation paradigm.
-**A:** Number of peaks, proportion of ChIP-seq and/or ATAC-seq peaks with a motif, and fold-enrichment of ATAC-peaks overlapping ChIP-seq peaks (i.e. bound peaks) for the motif across the four TFs. **B-C:** Enrichment of all tested motifs among the ATAC-seq peaks overlapping ChIP-seq peaks (relative to all ATAC-seq peaks), with the true motif labeled in black. The dots are colored either by co-occurence with the true motif (**B**) or by GC content (**C**). **D:** GC content distributions of the ChIP-seq peaks of each TF.
+**A:** Number of peaks, proportion of ChIP-seq and/or ATAC-seq peaks with a motif, and fold-enrichment of ATAC-peaks overlapping ChIP-seq peaks (i.e. bound peaks) for the motif across the four TFs. **B-C:** Enrichment of all tested motifs among the ATAC-seq peaks overlapping ChIP-seq peaks (relative to all ATAC-seq peaks), with the true motif labeled in black. The dots are colored either by co-occurence with the true motif (**B**) or by GC content, i.e. the summed probabilities of G and C across positions in the position probability matrix divided by the total sum (**C**). **D:** GC content distributions of the ChIP-seq peaks of each TF. With dotted lines the GC content of the true motif is indicated, with dashed lines the median GC content of the motifs showing stronger enrichment in the ChIP-seq peaks than the true motif.
 
 
 \newpage
@@ -360,7 +376,7 @@ meanVarPlot <- ggplot(meanCounts, aes(x=log10(mean), y=log10(var)))+
 
 
 
-**`r getFigNb()`: Distributions of fragment counts and variance of the simulations.**
+**`r getFigNb()`: Distribution of fragment counts and variance of the semi-simulations.**
 **A:** Per peak fragment count distributions of the original (dataset: "0") and simulated samples (datasets: "1", "3") with 1-fold and 3-fold perturbation strengths, for an example TF (CEBPB) across both paradigms. **B:** Mean-variance relationship of the original and simulated samples.
 
 
@@ -632,11 +648,9 @@ theme(legend.position="bottom",
   theme(plot.tag = element_text(face="bold", size=18), legend.position="bottom")
 ```
 
-**`r getFigNb()`: Positive control of the simulations.**
+**`r getFigNb()`: Positive control of the semi-simulations.**
 Shown are ranks and significance assigned by each method to the true motif across simulation parameters (TF, paradigm and perturbation strength). In light gray are the normal simulations (as shown in main Fig 4), while dark line and colored boxes correspond to the positive controls where a difference between the groups was only introduced in the peaks overlapping a motif of the true TF. 
 
-
-\newpage
 
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
@@ -826,7 +840,7 @@ h1 <- rankHeatmap2(copy(res),
 pdf("heatmap_full.pdf", width=10, height=14)
 draw(h1, heatmap_legend_side="right", 
          annotation_legend_side="bottom")
-dev.off()
+invisible(capture.output(dev.off()))
 ```
 
 
@@ -839,7 +853,7 @@ knitr::include_graphics("../simulations/heatmap_full.pdf")
 
 **`r getFigNb()`: Heatmap of performance of methods on the semi-simulated datasets.**
 As in main Fig 1, the heatmap shows the ranks the methods achieved across different simulated pertubation strengths and fold change distributions (activation and haploinsufficiency). The annotation bar to the left shows the mean network and archetype scores on pertubation strengths greater than zero.
-Ranking of the methods was performed as in Fig 1 and described in the methods section using all the datasets with a pertubation strength greater than zero. Where needed imputation of missing values was performed as previously described using only datasets with the same pertubation strength and fold change distribution. ATACseqTFEA was excluded for runtime reasons and diffTF could not be run on two of the datasets.
+Ranking of the methods was performed as in Fig 1 and described in the methods section using all the datasets with a pertubation strength greater than zero. Where needed imputation of missing values for the ranking was performed as previously described using only datasets with the same pertubation strength and fold change distribution. ATACseqTFEA was excluded for runtime reasons and diffTF could not be run on two of the datasets.
 
 \newpage
 
@@ -982,9 +996,9 @@ In addition to the simulated TF effect, two different fragment length distributi
 if(!file.exists("sim_frag_data_gc.rds")){
   simfrags <- readRDS("./data/sim_data_gc/MAZ_activation_0_FALSE_group/seq_files/simfrags.rds")
   simFrags <- simfrags$sim
-  simFrags[,gc:=fifelse(group=="group1", "strong", "baseline")]
+  simFrags[,gc:=fifelse(group=="group1", "alternative", "baseline")]
   simFrags$fld <- factor(simFrags$gc, 
-                         levels=c("baseline", "strong"), ordered=TRUE)
+                         levels=c("baseline", "alternative"), ordered=TRUE)
   fragDat <- simFrags[which(simFrags$sample %in% c("group1_1","group2_1")), c("gc","width","gc_content")]
   saveRDS(fragDat, "sim_frag_data_gc.rds")
 }else{
@@ -993,8 +1007,8 @@ if(!file.exists("sim_frag_data_gc.rds")){
 
 gcDist <- ggplot(fragDat, aes(x=gc_content, color=gc, fill=gc))+
 geom_density(alpha=0.7, lwd=1.5)+
-scale_color_manual(values=c("#fa8d24f9", "#952758ff"))+
-scale_fill_manual(values=c("#fa8d24f9", "#952758ff"))+
+scale_color_manual(values=c("#952758ff", "#fa8d24f9"))+
+scale_fill_manual(values=c("#952758ff", "#fa8d24f9"))+
 xlab("GC content")+
 guides(color=guide_legend(title="GC design"),
        fill="none")+
@@ -1021,10 +1035,10 @@ res[,method:=tstrsplit(method, keep=1, split=".", fixed=TRUE)]
 
 # rename GC types
 res[,gc:=fifelse(gc=="all_baseline", "all baseline", gc)]
-res[,gc:=fifelse(gc=="all_strong", "all strong", gc)]
+res[,gc:=fifelse(gc=="all_strong", "all alternative", gc)]
 res[,gc:=fifelse(gc=="group_NA", "grouped", gc)]
 res[,gc:=fifelse(gc=="intermediate_1", "intermediate", gc)]
-res$gc <- factor(res$gc, levels=c("all baseline", "all strong", 
+res$gc <- factor(res$gc, levels=c("all baseline", "all alternative", 
                                   "intermediate", "grouped"))
 
 # relcalculate ranks
