@@ -22,8 +22,8 @@ topMethods <- c("monaLisa.vsOthers", # real data / sim data
                 "chromVAR(z)>Qt>limma",
                 "diffTF(analytic)",
                 "decoupleR(mlm)>limma",
-                "MEIRLOP",# simulated data
-                "msVIPER(binary)", 
+                "MEIRLOP", 
+                "msVIPER(binary)", # simulated data
                 "chromVAR(z)>limma",
                 "decoupleR(consensus)>limma",
                 "ulm+GC")
