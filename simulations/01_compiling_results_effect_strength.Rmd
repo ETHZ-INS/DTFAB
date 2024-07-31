@@ -1,0 +1,119 @@
+---
+title: "01_effect_strength"
+author: "Emanuel Sonder"
+date: "06 11 2023"
+output: html_document
+---
+
+```{r setup}
+library(Rsamtools)
+library(BiocParallel)
+library(GenomicAlignments)
+library(regioneR)
+library(BSgenome.Hsapiens.UCSC.hg38)
+library(MASS)
+library(mclust)
+library(Repitools)
+library(data.table)
+
+data.table::setDTthreads(2)
+source("./scripts/atacSignalSimulation.R")
+source("../Scripts/runMethods.R")
+source("../Scripts/getInteractors.R")
+source("../Scripts/compileBenchmark.R")
+```
+
+# Compile results
+
+Format diffTF results:
+```{r, prepare diffTF results}
+transferDiffTFres(infolder="./diffTF/res", "./data/sim_data_es", noPerm=FALSE)
+transferDiffTFres(infolder="./diffTF/res/data_baseline", "./data/data_baseline", noPerm=FALSE)
+```
+
+Load effect strength results
+```{r, compile benchmark}
+foldersDatasets <- list.dirs("./data/sim_data_es", recursive=FALSE, full.names=FALSE)
+foldersDatasets <- foldersDatasets[!grepl("_0_", foldersDatasets) &
+                                   !grepl("data_baseline", foldersDatasets)]
+
+datasets <- lapply(foldersDatasets, function(ds){
+  tf <- unlist(tstrsplit(ds, split="_", keep=1))
+  if(grepl("ZN", tf))
+  {
+    tf <- c("ZN143", "ZNF143")
+  }
+  ds <- list(truth=tf,
+             species="h", 
+             type="sim",
+             seqStyle="UCSC",
+             peakFile="./peaks/merged_peaks.bed",
+             folder=paste0("data/sim_data_es/", ds),
+             readType="bed")
+  return(ds)
+})
+names(datasets) <- foldersDatasets
+
+resVar <- runCVariants(datasets)
+
+interactors <- getAllInteractors(NULL, extra=c("CEBPB","CTCF", "MAZ", "ZNF143"))
+archs <- list(h=readRDS("../misc/mergedMotifs.human.rds"),
+              m=readRDS("../misc/mergedMotifs.mouse.rds"))
+res <- compileBenchmark(datasets, interactors=interactors, archetypes=archs)
+res <- as.data.table(res)
+res[,dataset:=tstrsplit(dataset, split="/", keep=3)]
+res[,c("tf", "paradigm", "effect_strength"):=tstrsplit(dataset, split="_", keep=1:3)]
+res[,dataset:=paste(tf, paradigm, effect_strength, sep="_")]
+```
+
+Load baseline results
+```{r, compile baseline data, eval=TRUE}
+baseLineDatasets <- data.table(expand.grid(unique(res$tf), unique(res$paradigm)))
+colnames(baseLineDatasets) <- c("tf", "paradigm")
+baseLineDatasets[,name:=paste(tf, paradigm, 0, sep="_")]
+names <- baseLineDatasets$name
+
+baselineDatasets <- lapply(split(baseLineDatasets, by="name"), function(ds){
+  tf <- ds$tf
+  
+  if(grepl("ZN", tf))
+  {
+    tf <- c("ZN143", "ZNF143")
+  }
+  
+  ds <- list(truth=tf, # none
+             species="h", 
+             type="sim",
+             seqStyle="UCSC",
+             folder="./data/data_baseline",
+             name=ds$name,
+             readType="bed")
+  
+  return(ds)
+})
+
+
+names(baselineDatasets) <- names
+resBases <- lapply(1:length(baselineDatasets), function(i){
+  resVar <- runCVariants(baselineDatasets[i])
+  resBase <- compileBenchmark(baselineDatasets[i], interactors=interactors, archetypes=archs)
+  resBase$name <- baselineDatasets[[i]]$name
+  resBase
+})
+
+resBase <- rbindlist(resBases)
+resBase[,dataset:=tstrsplit(dataset, split="/", keep=3)]
+resBase[,c("tf", "paradigm", "effect_strength"):=tstrsplit(name, split="_", keep=1:3)]
+resBase[,dataset:=paste(tf, paradigm, effect_strength, sep="_")]
+```
+
+```{r, rbind results}
+res <- rbind(res, resBase, use.names=TRUE, fill=TRUE)
+saveRDS(res, "res_all_effect_strength.rds")
+```
+
+```{r}
+print(sessionInfo())
+```
+
+
