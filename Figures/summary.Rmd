@@ -94,7 +94,7 @@ resSumSim$method <- factor(resSumSim$method,
 realRank <- ggplot(resReal, aes(x=dataset, y=method, color=sqrt(rank))) +
   geom_point(aes(size=sig)) + 
   # geom_text(aes(label=rank), colour="white", alpha=0.5, size=3) + 
-  scale_size_manual(values=c(4,9), name="Detected (FDR<0.05)") +
+  scale_size_manual(values=c(4,9), name="Detected (adjusted p-value<=0.05)") +
   scale_color_gradientn(trans = "sqrt",
                         breaks=c(500,200,100,50,10,1),
                         colours=inferno(50), 
