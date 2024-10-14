@@ -147,7 +147,8 @@ es_perform <- (pact / phap) + #plot_annotation(tag_levels=list(c("B", "C")))+
 ```
 
 ```{r}
-scheme <- ggdraw() + draw_image("main_sim_scheme.png") + labs(tag="A") +
+scheme <- magick::image_read_svg("main_sim_scheme.svg", width=2880, height=1620)
+scheme <- magick::image_ggplot(scheme) + labs(tag="A") +
     theme(plot.tag = element_text(face="bold", size=16), plot.margin=unit(c(0,0,0,0), "pt"))
 
 act <- readRDS("../simulations/data/activation.rds")
@@ -161,9 +162,9 @@ lfc <- rbind(act, hap)
 
 lfcDist <- ggplot(lfc, aes(x=enr, y=lfc))+
   facet_grid(cols=vars(type), scales="free")+
-  geom_pointdensity()+
+  rasterise(geom_pointdensity(), dpi=300) +
   geom_hline(yintercept=0, linetype="dashed")+
-  scale_color_viridis(option="A", name="point density")+
+  scale_color_viridis(option="A", name="point density ", breaks=c(1000,4000,7000)) +
   ylab("Log fold change")+
   xlab("Enrichment over input")+
   labs(tag="B")+
@@ -178,7 +179,6 @@ lfcDist
 
 ```{r, fig.width=13.5, fig.height=16}
 pdf("Figure4.pdf", width=13.5, height=16)
-((scheme + free(lfcDist) + plot_layout(widths=c(4,3.3))) / es_perform) + 
-  plot_layout(heights = c(1.2,3))
+plot_grid((scheme + free(lfcDist) + plot_layout(widths=c(4,3.3))), es_perform, nrow=2, rel_heights=c(1.2,3))
 dev.off()
 ```
